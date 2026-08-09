@@ -37,3 +37,5 @@ jobs:
           REMOTE_USER: root
           SOURCE: "dist/"
           TARGET: "/var/www/vnotes"
+          # 删掉旧的文件
+          ARGS: "-rlgoDzvc -i --delete"
