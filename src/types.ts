@@ -26,6 +26,37 @@ export type MarkType = "GREEN" | "RED" | null;
 export type OpStatus = "new" | "edited" | "deleted";
 export type NodeContentType = 'TEXT' | 'IMAGE'
 
+interface NodeMutationFields {
+  label: string;
+  x: number;
+  y: number;
+  markType?: MarkType;
+  nodeType?: NodeType;
+  contentType?: NodeContentType;
+  imageWidth?: number;
+  imageHeight?: number;
+}
+
+/** 新增节点接口参数。uuid 是新增节点在一次批量更新中的唯一标识。 */
+export interface AddedNodeDto extends NodeMutationFields {
+  uuid: string;
+  parentId?: number | null;
+  parentUuid?: string | null;
+}
+
+/** 更新已有节点接口参数。id 和 parentId 只允许使用数据库数字 ID。 */
+export interface UpdatedNodeDto extends NodeMutationFields {
+  id: number;
+  parentId?: number | null;
+  parentUuid?: string | null;
+}
+
+export interface BatchUpdateNodesDto {
+  added: AddedNodeDto[];
+  updated: UpdatedNodeDto[];
+  deletedNodeIds: number[];
+}
+
 export interface NoteDetailData {
   directoryNodeId: number;
 }

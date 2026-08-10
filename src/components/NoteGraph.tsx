@@ -11,15 +11,19 @@ import useModal from '../components/useModal'
 import { Toast } from '../components/Toast'
 import SearchModal from '../components/SearchModal'
 import {
+    type AddedNodeDto,
+    type BatchUpdateNodesDto,
     type MarkType,
     type NodeContentType,
     type NodeData,
     type NodeType,
     type NoteDetailData,
+    type UpdatedNodeDto,
 } from '../types'
 import { API_BASE_URL, toggleNoteShare, moveNode, type Note } from '../api'
 import FilePicker from './FilePicker'
 import MoveSuccessModal from '../components/MoveSuccessModal'
+import { toAddedNodeDto, toUpdatedNodeDto } from '../nodeDtos'
 
 interface GestureInfo {
     type: 'none' | 'panning' | 'pinchAndZoom'
@@ -257,21 +261,10 @@ const NoteGraph = memo<NoteGraphProps>(
             try {
                 // console.log("save edit:", flatTree);
 
-                // added 新增的结点
-                // 必有 uuid，无 id，无视 id
-                // 如果是新增的子结点，则
-                //                     有 parentUuid（如果是新增结点的子结点）
-                //                     有 pid（如果是旧结点的新增子结点）
-                // updated 旧结点
-                //     必有 id，无视 uuid
-                //     如果旧结点只更新了除 parentId 之外的数据，pid 没变
-                //     如果旧结点更新了 parentId 为 某个旧结点的 id
-                //     如果旧结点更新了 parentId 为 某个新结点的 uuid
-
                 // 保存本次编辑结果到后端 API
-                const added: NodeData[] = []
-                const updated: NodeData[] = []
-                const deletedNodeIds: (number | string)[] = []
+                const added: AddedNodeDto[] = []
+                const updated: UpdatedNodeDto[] = []
+                const deletedNodeIds: number[] = []
 
                 const ft = flatTree.map(node => ({
                     ...node,
@@ -281,44 +274,20 @@ const NoteGraph = memo<NoteGraphProps>(
 
                 for (const node of ft) {
                     if (node.opStatus === 'new') {
-                        if (node.parentUuid !== null) {
-                            // 是新增结点的新增子结点，要把 parentId 置为 null
-                            added.push({
-                                ...node,
-                                parentId: null,
-                            })
-                        } else if (node.contentType === 'IMAGE') {
-                            added.push({
-                                ...node,
-                                // 无需传
-                                isTempImageUrl: undefined,
-                                imageUrl: undefined,
-                            })
-                        } else {
-                            added.push(node)
-                        }
+                        added.push(toAddedNodeDto(node))
                     } else if (node.opStatus === 'edited') {
-                        if (node.contentType === 'IMAGE') {
-                            updated.push({
-                                ...node,
-                                // 无需传
-                                isTempImageUrl: undefined,
-                                imageUrl: undefined,
-                            })
-                        } else {
-                            updated.push(node)
-                        }
+                        updated.push(toUpdatedNodeDto(node))
                     } else if (node.opStatus === 'deleted') {
+                        if (typeof node.id !== 'number') {
+                            throw new Error(
+                                `Deleted node id must be a number, received ${String(node.id)}`
+                            )
+                        }
                         deletedNodeIds.push(node.id)
                     }
                 }
 
-                const params: {
-                    added: NodeData[]
-                    updated: NodeData[]
-                    deletedNodeIds: (number | string)[]
-                    noteDetailId?: number
-                } = {
+                const params: BatchUpdateNodesDto = {
                     added,
                     updated,
                     deletedNodeIds,
@@ -369,7 +338,7 @@ const NoteGraph = memo<NoteGraphProps>(
                     // deleted -> remove from flatTree
 
                     for (const item of flatTree) {
-                        if (deletedNodeIds.includes(item.id)) {
+                        if (typeof item.id === 'number' && deletedNodeIds.includes(item.id)) {
                             continue
                         } else {
                             // reset opStatus
