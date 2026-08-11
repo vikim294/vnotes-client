@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { ArrowLeft, Home, Search } from 'lucide-react'
+import { ArrowLeft, CircleUserRound, Home, LoaderCircle, Search } from 'lucide-react'
 import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
 import { useNavigate } from 'react-router'
 import Button from '../components/Button'
@@ -20,10 +20,20 @@ import {
     type NoteDetailData,
     type UpdatedNodeDto,
 } from '../types'
-import { API_BASE_URL, toggleNoteShare, moveNode, type Note } from '../api'
+import {
+    API_BASE_URL,
+    getUserProfile,
+    IMAGE_BASE_URL,
+    moveNode,
+    toggleNoteShare,
+    uploadUserAvatar,
+    type Note,
+    type UserProfile,
+} from '../api'
 import FilePicker from './FilePicker'
 import MoveSuccessModal from '../components/MoveSuccessModal'
 import { toAddedNodeDto, toUpdatedNodeDto } from '../nodeDtos'
+import ProfilePanel from './ProfilePanel'
 
 interface GestureInfo {
     type: 'none' | 'panning' | 'pinchAndZoom'
@@ -211,6 +221,17 @@ const NoteGraph = memo<NoteGraphProps>(
 
         // search modal
         const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+
+        // profile
+        const {
+            Modal: ProfileModal,
+            openModal: openProfileModal,
+            closeModal: closeProfileModal,
+        } = useModal()
+        const [profile, setProfile] = useState<UserProfile | null>(null)
+        const [isProfileLoading, setIsProfileLoading] = useState(false)
+        const [profileError, setProfileError] = useState<string | null>(null)
+        const [isAvatarUploading, setIsAvatarUploading] = useState(false)
 
         // move node flow
         const [isMoveSearchOpen, setIsMoveSearchOpen] = useState(false)
@@ -518,6 +539,51 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeMenuVisible(false)
             setMoveSourceNodeId(selectedNodeId as number)
             setIsMoveSearchOpen(true)
+        }
+
+        const handleAvatarSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+            const input = event.currentTarget
+            const file = input.files?.[0]
+            input.value = ''
+            if (!file) return
+
+            setIsAvatarUploading(true)
+            try {
+                const uploadedUrl = await uploadUserAvatar(file)
+                setProfile((current) =>
+                    current
+                        ? {
+                              ...current,
+                              avatarUrl: uploadedUrl,
+                          }
+                        : current
+                )
+                Toast.success('头像已更新')
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '头像上传失败')
+            } finally {
+                setIsAvatarUploading(false)
+            }
+        }
+
+        const loadProfile = async () => {
+            setIsProfileLoading(true)
+            setProfileError(null)
+            try {
+                setProfile(await getUserProfile())
+            } catch (error) {
+                const message = error instanceof Error ? error.message : '个人资料加载失败'
+                setProfile(null)
+                setProfileError(message)
+                Toast.error(message)
+            } finally {
+                setIsProfileLoading(false)
+            }
+        }
+
+        const handleOpenProfile = () => {
+            openProfileModal()
+            void loadProfile()
         }
 
         const handleMoveSelectNote = async (note: Note) => {
@@ -1007,6 +1073,18 @@ const NoteGraph = memo<NoteGraphProps>(
                         </div>
                     )}
 
+                    {graphType === 'directory' && (
+                        <button
+                            type="button"
+                            onClick={handleOpenProfile}
+                            className="fixed top-4 left-4 grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                            title="个人资料"
+                            aria-label="打开个人资料"
+                        >
+                            <CircleUserRound className="h-5 w-5" />
+                        </button>
+                    )}
+
                     <div className="fixed top-0 right-0 text-[#ffffff5c] select-none">
                         <button
                             onClick={resetView}
@@ -1176,6 +1254,38 @@ const NoteGraph = memo<NoteGraphProps>(
 
                     {/* modals */}
                     <>
+                        <ProfileModal
+                            width={440}
+                            header="个人资料"
+                            closeOnClickMask
+                            footer={<Button onClick={closeProfileModal}>关闭</Button>}
+                        >
+                            {isProfileLoading ? (
+                                <div className="flex min-h-72 flex-col items-center justify-center gap-3 text-sm text-slate-400">
+                                    <LoaderCircle className="h-7 w-7 animate-spin text-indigo-400" />
+                                    正在加载个人资料
+                                </div>
+                            ) : profile ? (
+                                <ProfilePanel
+                                    profile={profile}
+                                    avatarUrl={
+                                        profile.avatarUrl
+                                            ? `${IMAGE_BASE_URL}${profile.avatarUrl}`
+                                            : null
+                                    }
+                                    isUploading={isAvatarUploading}
+                                    onAvatarSelect={handleAvatarSelect}
+                                />
+                            ) : (
+                                <div className="flex min-h-52 flex-col items-center justify-center gap-4 text-center">
+                                    <p className="text-sm text-slate-400">
+                                        {profileError ?? '个人资料加载失败'}
+                                    </p>
+                                    <Button onClick={() => void loadProfile()}>重新加载</Button>
+                                </div>
+                            )}
+                        </ProfileModal>
+
                         <NodeMarkModal
                             width={420}
                             header="Mark node"

@@ -35,6 +35,14 @@ export interface Note {
     updatedAt: string
 }
 
+export interface UserProfile {
+    id: number
+    username: string
+    email: string
+    avatarUrl: string | null
+    createdAt: string
+}
+
 export async function verifyToken(token: string): Promise<boolean> {
     try {
         const response = await fetch(`${API_BASE_URL}/auth/verify`, {
@@ -94,4 +102,32 @@ export async function moveNode(
         return res.data as { movedCount: number }
     }
     return null
+}
+
+export async function uploadUserAvatar(file: File): Promise<string> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await authFetch(`${API_BASE_URL}/user/avatar`, {
+        method: 'POST',
+        body: formData,
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || typeof res.data?.url !== 'string') {
+        throw new Error(res.message || '头像上传失败')
+    }
+
+    return res.data.url
+}
+
+export async function getUserProfile(): Promise<UserProfile> {
+    const response = await authFetch(`${API_BASE_URL}/user/profile`)
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '个人资料加载失败')
+    }
+
+    return res.data as UserProfile
 }
