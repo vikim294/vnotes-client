@@ -27,12 +27,10 @@ export type OpStatus = "new" | "edited" | "deleted";
 export type NodeContentType = 'TEXT' | 'IMAGE'
 
 interface NodeMutationFields {
-  label: string;
+  label: string | null;
   x: number;
   y: number;
   markType?: MarkType;
-  nodeType?: NodeType;
-  contentType?: NodeContentType;
   imageWidth?: number;
   imageHeight?: number;
 }
@@ -42,6 +40,8 @@ export interface AddedNodeDto extends NodeMutationFields {
   uuid: string;
   parentId?: number | null;
   parentUuid?: string | null;
+  nodeType?: NodeType;
+  contentType?: NodeContentType;
 }
 
 /** 更新已有节点接口参数。id 和 parentId 只允许使用数据库数字 ID。 */

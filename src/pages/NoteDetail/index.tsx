@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { type NodeData, type NoteDetailData } from '../../types'
-import { useParams, useSearchParams, useNavigate } from 'react-router'
+import { useParams, useSearchParams } from 'react-router'
 import { API_BASE_URL, authFetch } from '../../api'
 import NoteGraph from '../../components/NoteGraph'
 
@@ -12,11 +12,10 @@ function NoteDetail() {
     // data related
     const { id: directoryNodeId } = useParams()
     const [searchParams] = useSearchParams()
-    const navigate = useNavigate()
     const noteTitle = searchParams.get('label') || 'Untitled Note'
-    const [noteDetail, setNoteDetail] = useState<NoteDetailData | null>({
+    const noteDetail: NoteDetailData = {
         directoryNodeId: Number(directoryNodeId)
-    })
+    }
 
     const getNoteDetail = async () => {
         const response = await authFetch(`${API_BASE_URL}/note/directory/${directoryNodeId}/detail-nodes`)
@@ -31,16 +30,13 @@ function NoteDetail() {
 
             setAllowOperate(true)
 
-            console.log(res.data)
-
-
             setFlatTree(
                 res.data.map((node: NodeData) => ({
                     ...node,
+                    // 图片节点的后端 label 为 null，画布内部统一使用空字符串。
+                    label: node.label ?? '',
                     x: node.x,
                     y: node.y,
-                    // imageWidth: Number(node.imageWidth),
-                    // imageHeight: Number(node.imageHeight),
                 }))
             )
         }

@@ -22,6 +22,7 @@ import {
 } from '../types'
 import {
     API_BASE_URL,
+    authFetch,
     getUserProfile,
     IMAGE_BASE_URL,
     moveNode,
@@ -160,12 +161,14 @@ const NoteGraph = memo<NoteGraphProps>(
         const [nodeContentType, setNodeContentType] = useState<NodeContentType>('TEXT')
         // for previewing the selected image file before uploading
         const [tempFileUrl, setTempFileUrl] = useState<string | null>(null)
+        const [tempImageSize, setTempImageSize] = useState<{
+            width: number
+            height: number
+        } | null>(null)
         // for uploading
         const tempFileRef = useRef<File | null>(null)
         // for uploading(add)
         const uuidToFileMapRef = useRef<Record<string, File>>({})
-        // for uploading(edit)
-        const idToFileMapRef = useRef<Record<number | string, File>>({})
 
         // edit node
         const {
@@ -274,6 +277,8 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeType('DIRECTORY')
             setNodeContentType('TEXT')
             setTempFileUrl(null)
+            setTempImageSize(null)
+            tempFileRef.current = null
             openNewNodeAddModal()
         }
 
@@ -291,6 +296,8 @@ const NoteGraph = memo<NoteGraphProps>(
                     ...node,
                     x: Number(node.x.toFixed(2)),
                     y: Number(node.y.toFixed(2)),
+                    imageWidth: node.imageWidth ? Number(node.imageWidth.toFixed(2)) : undefined,
+                    imageHeight: node.imageHeight ? Number(node.imageHeight.toFixed(2)) : undefined,
                 }))
 
                 for (const node of ft) {
@@ -314,42 +321,46 @@ const NoteGraph = memo<NoteGraphProps>(
                     deletedNodeIds,
                 }
 
-                // if (graphType === 'detail') {
-                //     params.noteDetailId = noteDetail?.id
-                // }
-
                 const url =
                     graphType === 'directory'
                         ? `${API_BASE_URL}/note/directory/batch`
                         : `${API_BASE_URL}/note/directory/${noteDetail!.directoryNodeId}/detail-nodes/batch`
 
-                // console.log(added, updated, deletedNodeIds);
+                let response: Response
+                if (graphType === 'detail') {
+                    const formData = new FormData()
+                    formData.append(
+                        'request',
+                        new Blob([JSON.stringify(params)], { type: 'application/json' })
+                    )
 
-                // const fd = new FormData()
-                // fd.append('params', JSON.stringify(params))
-                // for (const [uuid, file] of Object.entries(uuidToFileMapRef.current)) {
-                //     fd.append(uuid, file)
-                // }
-                // for (const [id, file] of Object.entries(idToFileMapRef.current)) {
-                //     fd.append(id, file)
-                // }
+                    for (const node of added) {
+                        if (node.contentType !== 'IMAGE') continue
 
-                const token = localStorage.getItem('vnotes-token')
-                const response = await fetch(url, {
-                    method: 'PATCH',
-                    headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : {},
-                    body: JSON.stringify(params),
-                })
-                if (response.status === 401) {
-                    localStorage.removeItem('vnotes-token')
-                    window.location.href = '/'
-                    return
+                        const file = uuidToFileMapRef.current[node.uuid]
+                        if (!file) {
+                            throw new Error(`图片节点 ${node.uuid} 缺少待上传文件`)
+                        }
+                        formData.append(`file.${node.uuid}`, file)
+                    }
+
+                    // 不手动设置 Content-Type，浏览器需要自动附加 multipart boundary。
+                    response = await authFetch(url, {
+                        method: 'PATCH',
+                        body: formData,
+                    })
+                } else {
+                    response = await authFetch(url, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(params),
+                    })
                 }
+
                 const res = await response.json()
                 if (res.code === 0) {
                     // reset
                     uuidToFileMapRef.current = {}
-                    idToFileMapRef.current = {}
 
                     // 根据返回结果，更新 flatTree
                     const newFlatTree = []
@@ -381,7 +392,11 @@ const NoteGraph = memo<NoteGraphProps>(
 
                     setFlatTree(newFlatTree)
                     setEditMode(false)
+                } else {
+                    Toast.error(res.message || '保存失败')
                 }
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '保存失败')
             } finally {
                 setIsSaving(false)
             }
@@ -452,6 +467,8 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeType('DIRECTORY')
             setNodeContentType('TEXT')
             setTempFileUrl(null)
+            setTempImageSize(null)
+            tempFileRef.current = null
             openNodeAddModal()
         }
 
@@ -604,6 +621,11 @@ const NoteGraph = memo<NoteGraphProps>(
         }
 
         const handleNewNodeAddConfirm = () => {
+            if (nodeContentType === 'IMAGE' && (!tempFileRef.current || !tempImageSize)) {
+                Toast.error('请上传图片后再确认')
+                return
+            }
+
             const id = uuidv4()
             const newNode: NodeData = {
                 id,
@@ -620,6 +642,8 @@ const NoteGraph = memo<NoteGraphProps>(
                 contentType: nodeContentType,
                 isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
                 imageUrl: nodeContentType === 'IMAGE' ? (tempFileUrl ?? undefined) : undefined,
+                imageWidth: nodeContentType === 'IMAGE' ? tempImageSize?.width : undefined,
+                imageHeight: nodeContentType === 'IMAGE' ? tempImageSize?.height : undefined,
             }
 
             if (nodeContentType === 'IMAGE' && tempFileRef.current) {
@@ -634,10 +658,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleNodeEditConfirm = () => {
             if (!selectedNodeId) return
-            if (selectedNode?.contentType === 'IMAGE' && !tempFileUrl) {
-                Toast.error('请上传图片后再确认')
-                return
-            }
+            if (selectedNode?.contentType === 'IMAGE') return
 
             setFlatTree((prev) => {
                 const res = prev.map((node) => {
@@ -646,15 +667,6 @@ const NoteGraph = memo<NoteGraphProps>(
                             ...node,
                             label: nodeEditContent,
                             opStatus: node.opStatus === 'new' ? 'new' : 'edited',
-                            isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
-                            imageUrl:
-                                nodeContentType === 'IMAGE'
-                                    ? (tempFileUrl ?? undefined)
-                                    : undefined,
-                        }
-                        if (nodeContentType === 'IMAGE' && tempFileRef.current) {
-                            idToFileMapRef.current[newNode.id] = tempFileRef.current
-                            tempFileRef.current = null
                         }
                         return newNode
                     } else return node
@@ -669,6 +681,10 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleNodeAddConfirm = () => {
             if (!selectedNodeId) return
+            if (nodeContentType === 'IMAGE' && (!tempFileRef.current || !tempImageSize)) {
+                Toast.error('请上传图片后再确认')
+                return
+            }
 
             const pNode = flatTree.find((item) => item.id === selectedNodeId) as NodeData
 
@@ -693,6 +709,8 @@ const NoteGraph = memo<NoteGraphProps>(
                     contentType: nodeContentType,
                     isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
                     imageUrl: nodeContentType === 'IMAGE' ? (tempFileUrl ?? undefined) : undefined,
+                    imageWidth: nodeContentType === 'IMAGE' ? tempImageSize?.width : undefined,
+                    imageHeight: nodeContentType === 'IMAGE' ? tempImageSize?.height : undefined,
                 }
             } else {
                 // 旧结点的新增子结点
@@ -711,6 +729,8 @@ const NoteGraph = memo<NoteGraphProps>(
                     contentType: nodeContentType,
                     isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
                     imageUrl: nodeContentType === 'IMAGE' ? (tempFileUrl ?? undefined) : undefined,
+                    imageWidth: nodeContentType === 'IMAGE' ? tempImageSize?.width : undefined,
+                    imageHeight: nodeContentType === 'IMAGE' ? tempImageSize?.height : undefined,
                 }
             }
 
@@ -770,9 +790,19 @@ const NoteGraph = memo<NoteGraphProps>(
             fr.readAsDataURL(file)
             fr.onload = () => {
                 const result = fr.result as string
-                setTempFileUrl(result)
-                tempFileRef.current = file
+                const image = new Image()
+                image.onload = () => {
+                    setTempFileUrl(result)
+                    setTempImageSize({
+                        width: image.naturalWidth,
+                        height: image.naturalHeight,
+                    })
+                    tempFileRef.current = file
+                }
+                image.onerror = () => Toast.error('无法读取所选图片')
+                image.src = result
             }
+            fr.onerror = () => Toast.error('无法读取所选图片')
         }
 
         useLayoutEffect(() => {
@@ -1450,15 +1480,6 @@ const NoteGraph = memo<NoteGraphProps>(
                                 />
                             )}
 
-                            {selectedNode?.contentType === 'IMAGE' && (
-                                <>
-                                    <FilePicker handleFileChange={handleFileChange} />
-                                    <div className="mt-4">
-                                        {/* image preview */}
-                                        {tempFileUrl && <img src={tempFileUrl} />}
-                                    </div>
-                                </>
-                            )}
                         </NodeEditModal>
 
                         <NodeAddModal

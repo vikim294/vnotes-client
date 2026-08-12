@@ -150,13 +150,15 @@ export default function NodeMenu({
                 onPointerDown={(e) => e.stopPropagation()} // 阻止事件冒泡，防止点击菜单时关闭
                 ref={nodemenuElRef}
             >
-                {/* 编辑节点内容 */}
-                <Button className="block w-full" onClick={onEdit}>
-                    <div className="flex items-center gap-2">
-                        <Pencil className="h-4 w-4" />
-                        {selectedNode?.contentType === 'IMAGE' ? 'change image' : 'edit text'}
-                    </div>
-                </Button>
+                {/* 图片节点暂不支持替换图片，只能在画布上调整位置和大小。 */}
+                {selectedNode?.contentType !== 'IMAGE' && (
+                    <Button className="block w-full" onClick={onEdit}>
+                        <div className="flex items-center gap-2">
+                            <Pencil className="h-4 w-4" />
+                            edit text
+                        </div>
+                    </Button>
+                )}
                 {selectedNode?.nodeType !== 'DETAIL' && (
                     // 非 detail 节点才能新增子结点
                     // detail 节点是叶子节点，不允许有子节点

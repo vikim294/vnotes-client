@@ -1,12 +1,11 @@
 import type { AddedNodeDto, NodeData, UpdatedNodeDto } from './types'
 
 const getMutationFields = (node: NodeData) => ({
-    label: node.label,
+    // 图片内容由 multipart 文件承载，后端要求图片节点的 label 为 null。
+    label: node.contentType === 'IMAGE' ? null : node.label,
     x: node.x,
     y: node.y,
     markType: node.markType,
-    nodeType: node.nodeType,
-    contentType: node.contentType,
     imageWidth: node.imageWidth,
     imageHeight: node.imageHeight,
 })
@@ -35,6 +34,8 @@ export const toAddedNodeDto = (node: NodeData): AddedNodeDto => {
     return {
         ...getMutationFields(node),
         uuid: node.uuid,
+        nodeType: node.nodeType,
+        contentType: node.contentType,
         ...getParentReference(node),
     }
 }
