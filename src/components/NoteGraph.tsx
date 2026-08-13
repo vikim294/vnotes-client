@@ -1584,7 +1584,7 @@ const NoteGraph = memo<NoteGraphProps>(
                             }
                         />
                         {/* Move search modal */}
-                        {isMoveSearchOpen && (
+                        {/* {isMoveSearchOpen && (
                             <SearchModal
                                 isOpen={isMoveSearchOpen}
                                 onClose={() => {
@@ -1595,7 +1595,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                 mode="select"
                                 // excludeNoteId={noteDetail?.noteId}
                             />
-                        )}
+                        )} */}
 
                         {/* Move success modal */}
                         {moveSuccessTarget && (

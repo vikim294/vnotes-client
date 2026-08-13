@@ -26,13 +26,25 @@ export interface Note {
     x: number
     y: number
     parentId: number | null
-    parentUuid: string | null
-    uuid: string
-    userId: number
     nodeType: NodeType
-    isShared?: boolean
     createdAt: string
     updatedAt: string
+}
+
+export interface DirectorySearchParams {
+    keyword?: string
+    nodeType?: NodeType
+    startTime?: string
+    endTime?: string
+    page: number
+    pageSize: number
+}
+
+export interface PageResponse<T> {
+    list: T[]
+    page: number
+    pageSize: number
+    total: number
 }
 
 export interface UserProfile {
@@ -58,15 +70,30 @@ export async function verifyToken(token: string): Promise<boolean> {
     }
 }
 
-export async function searchNotes(keyword: string): Promise<Note[]> {
-    const response = await authFetch(
-        `${API_BASE_URL}/notes/search?keyword=${encodeURIComponent(keyword)}`
-    )
+export async function searchDirectoryNodes(
+    params: DirectorySearchParams,
+    signal?: AbortSignal
+): Promise<PageResponse<Note>> {
+    const searchParams = new URLSearchParams({
+        page: String(params.page),
+        pageSize: String(params.pageSize),
+    })
+
+    if (params.keyword?.trim()) searchParams.set('keyword', params.keyword.trim())
+    if (params.nodeType) searchParams.set('nodeType', params.nodeType)
+    if (params.startTime) searchParams.set('startTime', params.startTime)
+    if (params.endTime) searchParams.set('endTime', params.endTime)
+
+    const response = await authFetch(`${API_BASE_URL}/note/directory/search?${searchParams}`, {
+        signal,
+    })
     const res = await response.json()
-    if (res.code === 0) {
-        return res.data as Note[]
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '搜索失败')
     }
-    return []
+
+    return res.data as PageResponse<Note>
 }
 
 export async function toggleNoteShare(noteId: number): Promise<{ isShared: boolean } | null> {
