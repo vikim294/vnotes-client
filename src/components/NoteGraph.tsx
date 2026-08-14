@@ -1,6 +1,15 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { ArrowLeft, CircleUserRound, Home, LoaderCircle, Search } from 'lucide-react'
+import {
+    ArrowLeft,
+    CircleUserRound,
+    Download,
+    FileJson,
+    Home,
+    LoaderCircle,
+    RotateCcw,
+    Search,
+} from 'lucide-react'
 import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
 import { useNavigate } from 'react-router'
 import Button from '../components/Button'
@@ -23,6 +32,7 @@ import {
 import {
     API_BASE_URL,
     authFetch,
+    exportNotesAsJson,
     getUserProfile,
     IMAGE_BASE_URL,
     moveNode,
@@ -235,6 +245,14 @@ const NoteGraph = memo<NoteGraphProps>(
         const [isProfileLoading, setIsProfileLoading] = useState(false)
         const [profileError, setProfileError] = useState<string | null>(null)
         const [isAvatarUploading, setIsAvatarUploading] = useState(false)
+
+        // export notes
+        const {
+            Modal: ExportModal,
+            openModal: openExportModal,
+            closeModal: closeExportModal,
+        } = useModal()
+        const [isExporting, setIsExporting] = useState(false)
 
         // move node flow
         const [isMoveSearchOpen, setIsMoveSearchOpen] = useState(false)
@@ -601,6 +619,31 @@ const NoteGraph = memo<NoteGraphProps>(
         const handleOpenProfile = () => {
             openProfileModal()
             void loadProfile()
+        }
+
+        const handleExportNotes = async () => {
+            setIsExporting(true)
+            try {
+                const { blob, filename } = await exportNotesAsJson()
+                const downloadUrl = URL.createObjectURL(blob)
+                const anchor = document.createElement('a')
+                anchor.href = downloadUrl
+                anchor.download = filename
+                document.body.appendChild(anchor)
+                anchor.click()
+                anchor.remove()
+                window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0)
+                Toast.success('笔记已导出')
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '笔记导出失败')
+            } finally {
+                setIsExporting(false)
+            }
+        }
+
+        const handleExportConfirm = () => {
+            closeExportModal()
+            void handleExportNotes()
         }
 
         const handleMoveSelectNote = async (note: Note) => {
@@ -1104,24 +1147,42 @@ const NoteGraph = memo<NoteGraphProps>(
                     )}
 
                     {graphType === 'directory' && (
-                        <button
-                            type="button"
-                            onClick={handleOpenProfile}
-                            className="fixed top-4 left-4 grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
-                            title="个人资料"
-                            aria-label="打开个人资料"
-                        >
-                            <CircleUserRound className="h-5 w-5" />
-                        </button>
+                        <div className="fixed top-4 left-4 flex flex-col gap-2">
+                            <button
+                                type="button"
+                                onClick={handleOpenProfile}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                title="个人资料"
+                                aria-label="打开个人资料"
+                            >
+                                <CircleUserRound className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={openExportModal}
+                                disabled={isExporting}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
+                                title={isExporting ? '正在导出' : '导出笔记'}
+                                aria-label={isExporting ? '正在导出笔记' : '导出笔记'}
+                            >
+                                {isExporting ? (
+                                    <LoaderCircle className="h-5 w-5 animate-spin" />
+                                ) : (
+                                    <Download className="h-5 w-5" />
+                                )}
+                            </button>
+                        </div>
                     )}
 
-                    <div className="fixed top-0 right-0 text-[#ffffff5c] select-none">
+                    <div className="fixed top-4 right-4 select-none">
                         <button
+                            type="button"
                             onClick={resetView}
-                            className="hover:text-primary cursor-pointer transition-colors"
+                            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                            title="重置视图"
+                            aria-label="重置视图"
                         >
-                            {/* {viewport.zoom.toFixed(2)}  */}
-                            reset view
+                            <RotateCcw className="h-5 w-5" />
                         </button>
                     </div>
 
@@ -1315,6 +1376,47 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             )}
                         </ProfileModal>
+
+                        <ExportModal
+                            width={420}
+                            header="导出笔记"
+                            closeOnClickMask
+                            footer={
+                                <div className="flex items-center gap-3">
+                                    <Button onClick={closeExportModal}>取消</Button>
+                                    <Button type="primary" onClick={handleExportConfirm}>
+                                        确认导出
+                                    </Button>
+                                </div>
+                            }
+                        >
+                            <fieldset>
+                                <legend className="mb-4 text-sm text-slate-400">
+                                    选择导出格式
+                                </legend>
+                                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-indigo-500 bg-indigo-500/10 px-4 py-3">
+                                    <input
+                                        type="radio"
+                                        name="export-format"
+                                        value="json"
+                                        defaultChecked
+                                        className="accent-indigo-500"
+                                    />
+                                    <FileJson
+                                        className="h-5 w-5 shrink-0 text-indigo-300"
+                                        aria-hidden="true"
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="block text-sm font-medium text-slate-100">
+                                            导出为 JSON 文件
+                                        </span>
+                                        <span className="mt-0.5 block text-xs text-slate-400">
+                                            导出当前账号下的所有笔记
+                                        </span>
+                                    </span>
+                                </label>
+                            </fieldset>
+                        </ExportModal>
 
                         <NodeMarkModal
                             width={420}

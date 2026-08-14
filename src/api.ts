@@ -158,3 +158,19 @@ export async function getUserProfile(): Promise<UserProfile> {
 
     return res.data as UserProfile
 }
+
+export async function exportNotesAsJson(): Promise<{ blob: Blob; filename: string }> {
+    const response = await authFetch(`${API_BASE_URL}/note/export/json`)
+
+    if (!response.ok) {
+        throw new Error('笔记导出失败')
+    }
+
+    const contentDisposition = response.headers.get('Content-Disposition')
+    const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/i)
+
+    return {
+        blob: await response.blob(),
+        filename: filenameMatch?.[1] ?? 'notes.json',
+    }
+}
