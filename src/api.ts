@@ -174,3 +174,18 @@ export async function exportNotesAsJson(): Promise<{ blob: Blob; filename: strin
         filename: filenameMatch?.[1] ?? 'notes.json',
     }
 }
+
+export async function importNotesFromJson(file: File): Promise<void> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await authFetch(`${API_BASE_URL}/note/import/json`, {
+        method: 'POST',
+        body: formData,
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '笔记导入失败')
+    }
+}

@@ -9,6 +9,7 @@ import {
     LoaderCircle,
     RotateCcw,
     Search,
+    Upload,
 } from 'lucide-react'
 import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
 import { useNavigate } from 'react-router'
@@ -35,6 +36,7 @@ import {
     exportNotesAsJson,
     getUserProfile,
     IMAGE_BASE_URL,
+    importNotesFromJson,
     moveNode,
     toggleNoteShare,
     uploadUserAvatar,
@@ -253,6 +255,15 @@ const NoteGraph = memo<NoteGraphProps>(
             closeModal: closeExportModal,
         } = useModal()
         const [isExporting, setIsExporting] = useState(false)
+
+        // import notes
+        const {
+            Modal: ImportModal,
+            openModal: openImportModal,
+            closeModal: closeImportModal,
+        } = useModal()
+        const [importFile, setImportFile] = useState<File | null>(null)
+        const [isImporting, setIsImporting] = useState(false)
 
         // move node flow
         const [isMoveSearchOpen, setIsMoveSearchOpen] = useState(false)
@@ -644,6 +655,31 @@ const NoteGraph = memo<NoteGraphProps>(
         const handleExportConfirm = () => {
             closeExportModal()
             void handleExportNotes()
+        }
+
+        const handleOpenImport = () => {
+            setImportFile(null)
+            openImportModal()
+        }
+
+        const handleImportConfirm = async () => {
+            if (!importFile) {
+                Toast.error('请先选择 JSON 文件')
+                return
+            }
+
+            setIsImporting(true)
+            try {
+                await importNotesFromJson(importFile)
+                closeImportModal()
+                setImportFile(null)
+                Toast.success('笔记已导入')
+                onExitEdit()
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '笔记导入失败')
+            } finally {
+                setIsImporting(false)
+            }
         }
 
         const handleMoveSelectNote = async (note: Note) => {
@@ -1171,6 +1207,20 @@ const NoteGraph = memo<NoteGraphProps>(
                                     <Download className="h-5 w-5" />
                                 )}
                             </button>
+                            <button
+                                type="button"
+                                onClick={handleOpenImport}
+                                disabled={isImporting}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
+                                title={isImporting ? '正在导入' : '导入笔记'}
+                                aria-label={isImporting ? '正在导入笔记' : '导入笔记'}
+                            >
+                                {isImporting ? (
+                                    <LoaderCircle className="h-5 w-5 animate-spin" />
+                                ) : (
+                                    <Upload className="h-5 w-5" />
+                                )}
+                            </button>
                         </div>
                     )}
 
@@ -1417,6 +1467,76 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </label>
                             </fieldset>
                         </ExportModal>
+
+                        <ImportModal
+                            width={420}
+                            header="导入笔记"
+                            closeOnClickMask={!isImporting}
+                            footer={
+                                <div className="flex items-center gap-3">
+                                    <Button onClick={closeImportModal} disabled={isImporting}>
+                                        取消
+                                    </Button>
+                                    <Button
+                                        type="primary"
+                                        onClick={() => void handleImportConfirm()}
+                                        disabled={!importFile || isImporting}
+                                    >
+                                        {isImporting ? (
+                                            <span className="flex items-center gap-2">
+                                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                正在导入
+                                            </span>
+                                        ) : (
+                                            '确认导入'
+                                        )}
+                                    </Button>
+                                </div>
+                            }
+                        >
+                            <fieldset>
+                                <legend className="mb-4 text-sm text-slate-400">
+                                    选择导入格式
+                                </legend>
+                                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-indigo-500 bg-indigo-500/10 px-4 py-3">
+                                    <input
+                                        type="radio"
+                                        name="import-format"
+                                        value="json"
+                                        defaultChecked
+                                        className="accent-indigo-500"
+                                    />
+                                    <FileJson
+                                        className="h-5 w-5 shrink-0 text-indigo-300"
+                                        aria-hidden="true"
+                                    />
+                                    <span className="text-sm font-medium text-slate-100">
+                                        JSON 文件
+                                    </span>
+                                </label>
+                            </fieldset>
+
+                            <div className="mt-5">
+                                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-600 bg-slate-800/50 px-4 py-4 text-sm text-slate-300 transition-colors hover:border-indigo-500/70 hover:bg-indigo-500/10 hover:text-indigo-200">
+                                    <Upload className="h-4 w-4" aria-hidden="true" />
+                                    <span>{importFile ? '重新选择 JSON 文件' : '上传 JSON 文件'}</span>
+                                    <input
+                                        type="file"
+                                        accept="application/json,.json"
+                                        className="sr-only"
+                                        disabled={isImporting}
+                                        onChange={(event) => {
+                                            setImportFile(event.currentTarget.files?.[0] ?? null)
+                                        }}
+                                    />
+                                </label>
+                                {importFile && (
+                                    <p className="mt-3 truncate text-xs text-slate-400" title={importFile.name}>
+                                        已选择：{importFile.name}
+                                    </p>
+                                )}
+                            </div>
+                        </ImportModal>
 
                         <NodeMarkModal
                             width={420}
