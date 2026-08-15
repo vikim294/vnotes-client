@@ -40,6 +40,7 @@ import {
     moveNode,
     toggleNoteShare,
     uploadUserAvatar,
+    type ImportStrategy,
     type Note,
     type UserProfile,
 } from '../api'
@@ -263,6 +264,7 @@ const NoteGraph = memo<NoteGraphProps>(
             closeModal: closeImportModal,
         } = useModal()
         const [importFile, setImportFile] = useState<File | null>(null)
+        const [importStrategy, setImportStrategy] = useState<ImportStrategy>('APPEND')
         const [isImporting, setIsImporting] = useState(false)
 
         // move node flow
@@ -659,6 +661,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleOpenImport = () => {
             setImportFile(null)
+            setImportStrategy('APPEND')
             openImportModal()
         }
 
@@ -670,7 +673,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
             setIsImporting(true)
             try {
-                await importNotesFromJson(importFile)
+                await importNotesFromJson(importFile, importStrategy)
                 closeImportModal()
                 setImportFile(null)
                 Toast.success('笔记已导入')
@@ -1514,6 +1517,64 @@ const NoteGraph = memo<NoteGraphProps>(
                                         JSON 文件
                                     </span>
                                 </label>
+                            </fieldset>
+
+                            <fieldset className="mt-5">
+                                <legend className="mb-4 text-sm text-slate-400">
+                                    选择导入策略
+                                </legend>
+                                <div className="grid gap-3">
+                                    <label
+                                        className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors ${
+                                            importStrategy === 'APPEND'
+                                                ? 'border-indigo-500 bg-indigo-500/10'
+                                                : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="import-strategy"
+                                            value="APPEND"
+                                            checked={importStrategy === 'APPEND'}
+                                            disabled={isImporting}
+                                            onChange={() => setImportStrategy('APPEND')}
+                                            className="mt-0.5 accent-indigo-500"
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium text-slate-100">
+                                                追加导入
+                                            </span>
+                                            <span className="mt-0.5 block text-xs text-slate-400">
+                                                保留现有笔记，将文件中的笔记追加进来
+                                            </span>
+                                        </span>
+                                    </label>
+                                    <label
+                                        className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition-colors ${
+                                            importStrategy === 'CLEAR'
+                                                ? 'border-rose-500 bg-rose-500/10'
+                                                : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="import-strategy"
+                                            value="CLEAR"
+                                            checked={importStrategy === 'CLEAR'}
+                                            disabled={isImporting}
+                                            onChange={() => setImportStrategy('CLEAR')}
+                                            className="mt-0.5 accent-rose-500"
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium text-slate-100">
+                                                清空后导入
+                                            </span>
+                                            <span className="mt-0.5 block text-xs text-rose-300/80">
+                                                先删除当前账号的所有笔记，再导入文件内容
+                                            </span>
+                                        </span>
+                                    </label>
+                                </div>
                             </fieldset>
 
                             <div className="mt-5">

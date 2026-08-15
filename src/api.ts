@@ -175,14 +175,23 @@ export async function exportNotesAsJson(): Promise<{ blob: Blob; filename: strin
     }
 }
 
-export async function importNotesFromJson(file: File): Promise<void> {
+export type ImportStrategy = 'APPEND' | 'CLEAR'
+
+export async function importNotesFromJson(
+    file: File,
+    strategy: ImportStrategy = 'APPEND'
+): Promise<void> {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await authFetch(`${API_BASE_URL}/note/import/json`, {
-        method: 'POST',
-        body: formData,
-    })
+    const searchParams = new URLSearchParams({ strategy })
+    const response = await authFetch(
+        `${API_BASE_URL}/note/import/json?${searchParams.toString()}`,
+        {
+            method: 'POST',
+            body: formData,
+        }
+    )
     const res = await response.json()
 
     if (!response.ok || res.code !== 0) {
