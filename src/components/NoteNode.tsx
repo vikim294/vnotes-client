@@ -14,6 +14,7 @@ import { Share2 } from "lucide-react";
 import type { NodeData, NodeType } from "../types";
 import { getImageNodeUrl } from "../utils";
 import { Toast } from "../components/Toast";
+import imageNotFoundUrl from "../../assets/image_not_found.webp";
 
 const createNodeMenuEvent = (detail: {
   nodeId: number | string;
@@ -394,11 +395,11 @@ export default function NoteNode({
         ></NodeLabel>
       )}
 
-      {contentType === "IMAGE" && imageUrl && (
+      {contentType === "IMAGE" && (
         <NodeImage
           nodeId={id}
-          isTempImageUrl={isTempImageUrl}
-          imageUrl={imageUrl}
+          isTempImageUrl={imageUrl ? isTempImageUrl : true}
+          imageUrl={imageUrl || imageNotFoundUrl}
           imageWidth={imageWidth}
           imageHeight={imageHeight}
           size={nodeSize}
