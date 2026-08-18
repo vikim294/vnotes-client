@@ -457,6 +457,39 @@ body,
   margin-top: 28px;
 }
 
+.auth-method-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #30394a;
+  border-radius: 11px;
+  background: rgb(17 24 39 / 0.66);
+}
+
+.auth-method-tab {
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  color: #8f9aaa;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-method-tab:hover {
+  color: #d7dce4;
+}
+
+.auth-method-tab.is-active {
+  color: #eef2ff;
+  background: #30394a;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+}
+
 .auth-field {
   display: grid;
   gap: 8px;
@@ -507,6 +540,46 @@ body,
 
 .auth-input-wrap input::placeholder {
   color: #667184;
+}
+
+.auth-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px;
+  gap: 10px;
+}
+
+.auth-code-button {
+  border: 1px solid #434d61;
+  border-radius: 11px;
+  color: #c7d2fe;
+  background: rgb(49 46 129 / 0.24);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.auth-code-button:hover:not(:disabled) {
+  border-color: #6366f1;
+  color: #eef2ff;
+  background: rgb(79 70 229 / 0.3);
+}
+
+.auth-code-button:disabled {
+  color: #727d8f;
+  background: rgb(31 41 55 / 0.62);
+  cursor: not-allowed;
+}
+
+.auth-spinner {
+  animation: auth-spin 800ms linear infinite;
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .auth-options {
@@ -585,6 +658,13 @@ body,
   transform: translateY(0);
 }
 
+.auth-submit:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
 .auth-switch {
   margin: 24px 0 0;
   color: #8f9aaa;
@@ -645,6 +725,10 @@ body,
   .auth-field-row {
     grid-template-columns: 1fr;
     gap: 15px;
+  }
+
+  .auth-code-row {
+    grid-template-columns: minmax(0, 1fr) 112px;
   }
 
   .auth-heading h1 {

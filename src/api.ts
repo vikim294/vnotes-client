@@ -55,6 +55,56 @@ export interface UserProfile {
     createdAt: string
 }
 
+export interface LoginResult {
+    accessToken: string
+    tokenType: string
+    expiresIn: number
+}
+
+interface ApiResponse<T> {
+    code: number
+    message: string
+    data: T
+}
+
+async function postAuth<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+    })
+    const res = (await response.json()) as ApiResponse<T>
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '请求失败')
+    }
+
+    return res
+}
+
+export async function loginByEmailAndPassword(
+    email: string,
+    password: string
+): Promise<ApiResponse<LoginResult>> {
+    return postAuth<LoginResult>('/auth/login/email-password', { email, password })
+}
+
+export async function sendLoginVerificationCode(email: string): Promise<ApiResponse<void>> {
+    return postAuth<void>('/auth/send-verification-code', { email })
+}
+
+export async function loginByEmailAndVerificationCode(
+    email: string,
+    verificationCode: string
+): Promise<ApiResponse<LoginResult>> {
+    return postAuth<LoginResult>('/auth/login/email-verification-code', {
+        email,
+        verificationCode,
+    })
+}
+
 export async function verifyToken(token: string): Promise<boolean> {
     try {
         const response = await fetch(`${API_BASE_URL}/auth/verify`, {
