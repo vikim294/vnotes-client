@@ -184,6 +184,24 @@ export async function searchTrashBinNodes(
     return res.data as PageResponse<TrashBinDirectoryNode>
 }
 
+export async function restoreTrashBinNodes(ids: number[]): Promise<void> {
+    const response = await authFetch(
+        `${API_BASE_URL}/note/directory/trash-bin/batch-restore`,
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ ids }),
+        }
+    )
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '目录节点恢复失败')
+    }
+}
+
 export async function toggleNoteShare(noteId: number): Promise<{ isShared: boolean } | null> {
     try {
         const response = await authFetch(`${API_BASE_URL}/notes/share`, {

@@ -1881,6 +1881,7 @@ const NoteGraph = memo<NoteGraphProps>(
                         <TrashBinModal
                             isOpen={isTrashBinOpen}
                             onClose={() => setIsTrashBinOpen(false)}
+                            onRestored={onExitEdit}
                         />
                         {/* Move search modal */}
                         {/* {isMoveSearchOpen && (

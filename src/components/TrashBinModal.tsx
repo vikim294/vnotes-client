@@ -11,18 +11,22 @@ import {
     Search,
     SlidersHorizontal,
     Trash2,
+    Undo2,
     X,
 } from 'lucide-react'
 import {
+    restoreTrashBinNodes,
     searchTrashBinNodes,
     type PageResponse,
     type TrashBinDirectoryNode,
 } from '../api'
 import type { NodeType } from '../types'
+import { Toast } from './Toast'
 
 interface TrashBinModalProps {
     isOpen: boolean
     onClose: () => void
+    onRestored: () => void
 }
 
 const PAGE_SIZE = 10
@@ -75,7 +79,11 @@ const getExclusiveEndTime = (dateValue: string) => {
     return `${year}-${month}-${day}T00:00:00`
 }
 
-export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
+export default function TrashBinModal({
+    isOpen,
+    onClose,
+    onRestored,
+}: TrashBinModalProps) {
     const [query, setQuery] = useState('')
     const [debouncedQuery, setDebouncedQuery] = useState('')
     const [nodeType, setNodeType] = useState<NodeType | ''>('')
@@ -85,6 +93,9 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
     const [result, setResult] = useState<PageResponse<TrashBinDirectoryNode>>(EMPTY_PAGE)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
+    const [isRestoring, setIsRestoring] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
     const inputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -136,7 +147,7 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
             window.clearTimeout(timer)
             controller.abort()
         }
-    }, [debouncedQuery, endDate, isOpen, nodeType, page, startDate])
+    }, [debouncedQuery, endDate, isOpen, nodeType, page, refreshKey, startDate])
 
     useEffect(() => {
         if (!isOpen) return
@@ -145,26 +156,33 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && isOpen) onClose()
+            if (event.key === 'Escape' && isOpen && !isRestoring) onClose()
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [isOpen, onClose])
+    }, [isOpen, isRestoring, onClose])
 
     const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize))
     const pageItems = getPageItems(page, totalPages)
     const activeFilterCount = (nodeType ? 1 : 0) + (startDate ? 1 : 0) + (endDate ? 1 : 0)
+    const currentPageIds = result.list.map((node) => node.id)
+    const isCurrentPageSelected =
+        currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id))
 
     const resetPage = () => setPage(1)
+
+    const clearSelection = () => setSelectedIds(new Set())
 
     const resetFilters = () => {
         setNodeType('')
         setStartDate('')
         setEndDate('')
+        clearSelection()
         resetPage()
     }
 
     const handleClose = () => {
+        if (isRestoring) return
         setQuery('')
         setDebouncedQuery('')
         setNodeType('')
@@ -173,7 +191,46 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
         setPage(1)
         setResult(EMPTY_PAGE)
         setError(null)
+        clearSelection()
         onClose()
+    }
+
+    const toggleSelectedId = (id: number) => {
+        setSelectedIds((current) => {
+            const next = new Set(current)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const toggleCurrentPage = () => {
+        setSelectedIds((current) => {
+            const next = new Set(current)
+            if (isCurrentPageSelected) currentPageIds.forEach((id) => next.delete(id))
+            else currentPageIds.forEach((id) => next.add(id))
+            return next
+        })
+    }
+
+    const handleRestore = async () => {
+        if (selectedIds.size === 0) return
+
+        setIsRestoring(true)
+        try {
+            await restoreTrashBinNodes(Array.from(selectedIds))
+            Toast.success(`已恢复 ${selectedIds.size} 个目录节点`)
+            clearSelection()
+            setPage(1)
+            setRefreshKey((current) => current + 1)
+            onRestored()
+        } catch (restoreError) {
+            Toast.error(
+                restoreError instanceof Error ? restoreError.message : '目录节点恢复失败'
+            )
+        } finally {
+            setIsRestoring(false)
+        }
     }
 
     if (!isOpen) return null
@@ -205,7 +262,8 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-slate-100"
+                            disabled={isRestoring}
+                            className="cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label="关闭回收站"
                         >
                             <X className="h-5 w-5" />
@@ -220,6 +278,7 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                             value={query}
                             onChange={(event) => {
                                 setQuery(event.target.value)
+                                clearSelection()
                                 resetPage()
                             }}
                             placeholder="搜索已删除节点的名称…"
@@ -230,6 +289,7 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                                 type="button"
                                 onClick={() => {
                                     setQuery('')
+                                    clearSelection()
                                     resetPage()
                                     inputRef.current?.focus()
                                 }}
@@ -272,6 +332,7 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                                 value={nodeType}
                                 onChange={(event) => {
                                     setNodeType(event.target.value as NodeType | '')
+                                    clearSelection()
                                     resetPage()
                                 }}
                                 className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500"
@@ -292,6 +353,7 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                                 max={endDate || undefined}
                                 onChange={(event) => {
                                     setStartDate(event.target.value)
+                                    clearSelection()
                                     resetPage()
                                 }}
                                 className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500"
@@ -308,11 +370,43 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                                 min={startDate || undefined}
                                 onChange={(event) => {
                                     setEndDate(event.target.value)
+                                    clearSelection()
                                     resetPage()
                                 }}
                                 className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500"
                             />
                         </label>
+                    </div>
+                </div>
+
+                <div className="border-surface-700 flex min-h-12 items-center justify-between gap-3 border-b bg-slate-900/65 px-5 py-2.5">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+                        <input
+                            type="checkbox"
+                            checked={isCurrentPageSelected}
+                            disabled={result.list.length === 0 || isLoading || isRestoring}
+                            onChange={toggleCurrentPage}
+                            className="h-4 w-4 accent-rose-500"
+                        />
+                        全选当前页
+                    </label>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500">
+                            已选择 <span className="font-medium text-slate-200">{selectedIds.size}</span> 项
+                        </span>
+                        <button
+                            type="button"
+                            disabled={selectedIds.size === 0 || isRestoring}
+                            onClick={() => void handleRestore()}
+                            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+                        >
+                            {isRestoring ? (
+                                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Undo2 className="h-3.5 w-3.5" />
+                            )}
+                            {isRestoring ? '正在恢复' : '恢复所选'}
+                        </button>
                     </div>
                 </div>
 
@@ -334,7 +428,20 @@ export default function TrashBinModal({ isOpen, onClose }: TrashBinModalProps) {
                     ) : (
                         <ul className="divide-surface-700 divide-y">
                             {result.list.map((node) => (
-                                <li key={node.id} className="flex items-center gap-3 px-5 py-3.5">
+                                <li
+                                    key={node.id}
+                                    className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${
+                                        selectedIds.has(node.id) ? 'bg-rose-500/5' : ''
+                                    }`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.has(node.id)}
+                                        disabled={isRestoring}
+                                        onChange={() => toggleSelectedId(node.id)}
+                                        aria-label={`选择 ${node.label}`}
+                                        className="h-4 w-4 shrink-0 cursor-pointer accent-rose-500 disabled:cursor-not-allowed"
+                                    />
                                     {node.nodeType === 'DETAIL' ? (
                                         <FileText className="h-4 w-4 shrink-0 text-emerald-400" />
                                     ) : (
