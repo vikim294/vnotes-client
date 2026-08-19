@@ -9,6 +9,7 @@ import {
     LoaderCircle,
     RotateCcw,
     Search,
+    Trash2,
     Upload,
 } from 'lucide-react'
 import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
@@ -48,6 +49,7 @@ import FilePicker from './FilePicker'
 import MoveSuccessModal from '../components/MoveSuccessModal'
 import { toAddedNodeDto, toUpdatedNodeDto } from '../nodeDtos'
 import ProfilePanel from './ProfilePanel'
+import TrashBinModal from './TrashBinModal'
 
 interface GestureInfo {
     type: 'none' | 'panning' | 'pinchAndZoom'
@@ -237,6 +239,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
         // search modal
         const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+        const [isTrashBinOpen, setIsTrashBinOpen] = useState(false)
 
         // profile
         const {
@@ -1224,6 +1227,15 @@ const NoteGraph = memo<NoteGraphProps>(
                                     <Upload className="h-5 w-5" />
                                 )}
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsTrashBinOpen(true)}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-rose-500/70 hover:text-rose-300"
+                                title="回收站"
+                                aria-label="打开回收站"
+                            >
+                                <Trash2 className="h-5 w-5" />
+                            </button>
                         </div>
                     )}
 
@@ -1865,6 +1877,10 @@ const NoteGraph = memo<NoteGraphProps>(
                                     `/noteDetails/${note.id}?label=${encodeURIComponent(note.label)}`
                                 )
                             }
+                        />
+                        <TrashBinModal
+                            isOpen={isTrashBinOpen}
+                            onClose={() => setIsTrashBinOpen(false)}
                         />
                         {/* Move search modal */}
                         {/* {isMoveSearchOpen && (

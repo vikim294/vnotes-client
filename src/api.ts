@@ -31,6 +31,17 @@ export interface Note {
     updatedAt: string
 }
 
+export interface TrashBinDirectoryNode {
+    id: number
+    label: string
+    x: number
+    y: number
+    nodeType: NodeType
+    createdAt: string
+    updatedAt: string
+    deletedAt: string
+}
+
 export interface DirectorySearchParams {
     keyword?: string
     nodeType?: NodeType
@@ -144,6 +155,33 @@ export async function searchDirectoryNodes(
     }
 
     return res.data as PageResponse<Note>
+}
+
+export async function searchTrashBinNodes(
+    params: DirectorySearchParams,
+    signal?: AbortSignal
+): Promise<PageResponse<TrashBinDirectoryNode>> {
+    const searchParams = new URLSearchParams({
+        page: String(params.page),
+        pageSize: String(params.pageSize),
+    })
+
+    if (params.keyword?.trim()) searchParams.set('keyword', params.keyword.trim())
+    if (params.nodeType) searchParams.set('nodeType', params.nodeType)
+    if (params.startTime) searchParams.set('startTime', params.startTime)
+    if (params.endTime) searchParams.set('endTime', params.endTime)
+
+    const response = await authFetch(
+        `${API_BASE_URL}/note/directory/trash-bin/search?${searchParams}`,
+        { signal }
+    )
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '回收站加载失败')
+    }
+
+    return res.data as PageResponse<TrashBinDirectoryNode>
 }
 
 export async function toggleNoteShare(noteId: number): Promise<{ isShared: boolean } | null> {
