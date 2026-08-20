@@ -4,6 +4,7 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    Clock3,
     FileText,
     Folder,
     LoaderCircle,
@@ -275,7 +276,7 @@ export default function TrashBinModal({
                 onPointerDown={(event) => event.stopPropagation()}
             >
                 <div className="border-surface-700 border-b bg-gradient-to-b from-slate-800/55 to-slate-900/20 px-5 pt-5 pb-4">
-                    <div className="mb-4 flex items-start justify-between gap-4">
+                    <div className="mb-3 flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500/10 text-rose-400">
                                 <Trash2 className="h-4.5 w-4.5" />
@@ -298,6 +299,11 @@ export default function TrashBinModal({
                         >
                             <X className="h-5 w-5" />
                         </button>
+                    </div>
+
+                    <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/15 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/80">
+                        <Clock3 className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                        已删除内容保留 30 天，逾期将自动彻底删除
                     </div>
 
                     <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-600/80 bg-slate-950/55 px-4 shadow-inner transition-colors focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-500/15">
