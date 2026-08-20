@@ -15,6 +15,7 @@ import {
     X,
 } from 'lucide-react'
 import {
+    permanentlyDeleteTrashBinNodes,
     restoreTrashBinNodes,
     searchTrashBinNodes,
     type PageResponse,
@@ -95,6 +96,8 @@ export default function TrashBinModal({
     const [error, setError] = useState<string | null>(null)
     const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
     const [isRestoring, setIsRestoring] = useState(false)
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -156,11 +159,13 @@ export default function TrashBinModal({
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && isOpen && !isRestoring) onClose()
+            if (event.key !== 'Escape' || !isOpen || isRestoring || isDeleting) return
+            if (isDeleteConfirmOpen) setIsDeleteConfirmOpen(false)
+            else onClose()
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [isOpen, isRestoring, onClose])
+    }, [isDeleteConfirmOpen, isDeleting, isOpen, isRestoring, onClose])
 
     const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize))
     const pageItems = getPageItems(page, totalPages)
@@ -168,6 +173,7 @@ export default function TrashBinModal({
     const currentPageIds = result.list.map((node) => node.id)
     const isCurrentPageSelected =
         currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id))
+    const isMutating = isRestoring || isDeleting
 
     const resetPage = () => setPage(1)
 
@@ -182,7 +188,7 @@ export default function TrashBinModal({
     }
 
     const handleClose = () => {
-        if (isRestoring) return
+        if (isMutating || isDeleteConfirmOpen) return
         setQuery('')
         setDebouncedQuery('')
         setNodeType('')
@@ -191,6 +197,7 @@ export default function TrashBinModal({
         setPage(1)
         setResult(EMPTY_PAGE)
         setError(null)
+        setIsDeleteConfirmOpen(false)
         clearSelection()
         onClose()
     }
@@ -233,6 +240,29 @@ export default function TrashBinModal({
         }
     }
 
+    const handlePermanentDelete = async () => {
+        if (selectedIds.size === 0) return
+
+        const deleteCount = selectedIds.size
+        setIsDeleting(true)
+        try {
+            await permanentlyDeleteTrashBinNodes(Array.from(selectedIds))
+            Toast.success(`已彻底删除 ${deleteCount} 个目录节点`)
+            setIsDeleteConfirmOpen(false)
+            clearSelection()
+            setPage(1)
+            setRefreshKey((current) => current + 1)
+        } catch (deleteError) {
+            Toast.error(
+                deleteError instanceof Error
+                    ? deleteError.message
+                    : '目录节点彻底删除失败'
+            )
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     if (!isOpen) return null
 
     return createPortal(
@@ -262,7 +292,7 @@ export default function TrashBinModal({
                         <button
                             type="button"
                             onClick={handleClose}
-                            disabled={isRestoring}
+                            disabled={isMutating}
                             className="cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                             aria-label="关闭回收站"
                         >
@@ -384,19 +414,19 @@ export default function TrashBinModal({
                         <input
                             type="checkbox"
                             checked={isCurrentPageSelected}
-                            disabled={result.list.length === 0 || isLoading || isRestoring}
+                            disabled={result.list.length === 0 || isLoading || isMutating}
                             onChange={toggleCurrentPage}
                             className="h-4 w-4 accent-rose-500"
                         />
                         全选当前页
                     </label>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-500">
                             已选择 <span className="font-medium text-slate-200">{selectedIds.size}</span> 项
                         </span>
                         <button
                             type="button"
-                            disabled={selectedIds.size === 0 || isRestoring}
+                            disabled={selectedIds.size === 0 || isMutating}
                             onClick={() => void handleRestore()}
                             className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
                         >
@@ -406,6 +436,15 @@ export default function TrashBinModal({
                                 <Undo2 className="h-3.5 w-3.5" />
                             )}
                             {isRestoring ? '正在恢复' : '恢复所选'}
+                        </button>
+                        <button
+                            type="button"
+                            disabled={selectedIds.size === 0 || isMutating}
+                            onClick={() => setIsDeleteConfirmOpen(true)}
+                            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-rose-600 px-3 text-xs font-medium text-white transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            彻底删除
                         </button>
                     </div>
                 </div>
@@ -437,7 +476,7 @@ export default function TrashBinModal({
                                     <input
                                         type="checkbox"
                                         checked={selectedIds.has(node.id)}
-                                        disabled={isRestoring}
+                                        disabled={isMutating}
                                         onChange={() => toggleSelectedId(node.id)}
                                         aria-label={`选择 ${node.label}`}
                                         className="h-4 w-4 shrink-0 cursor-pointer accent-rose-500 disabled:cursor-not-allowed"
@@ -480,7 +519,7 @@ export default function TrashBinModal({
                     <nav className="flex items-center gap-1" aria-label="回收站分页">
                         <button
                             type="button"
-                            disabled={page <= 1 || isLoading}
+                            disabled={page <= 1 || isLoading || isMutating}
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
                             className="flex h-8 cursor-pointer items-center gap-1 rounded-md border border-slate-700 px-2 text-xs text-slate-300 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                         >
@@ -492,7 +531,7 @@ export default function TrashBinModal({
                                 <button
                                     key={item}
                                     type="button"
-                                    disabled={isLoading}
+                                    disabled={isLoading || isMutating}
                                     onClick={() => setPage(item)}
                                     aria-current={item === page ? 'page' : undefined}
                                     className={`h-8 min-w-8 cursor-pointer rounded-md px-2 text-xs transition-colors disabled:cursor-not-allowed ${
@@ -512,7 +551,7 @@ export default function TrashBinModal({
 
                         <button
                             type="button"
-                            disabled={page >= totalPages || isLoading}
+                            disabled={page >= totalPages || isLoading || isMutating}
                             onClick={() =>
                                 setPage((current) => Math.min(totalPages, current + 1))
                             }
@@ -523,6 +562,67 @@ export default function TrashBinModal({
                     </nav>
                 </div>
             </div>
+
+            {isDeleteConfirmOpen && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+                    onPointerDown={(event) => event.stopPropagation()}
+                >
+                    <div
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="trash-delete-confirm-title"
+                        className="border-surface-700 bg-surface-900 w-full max-w-md rounded-xl border shadow-2xl"
+                    >
+                        <div className="border-surface-700 flex items-center gap-3 border-b px-6 py-4">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-rose-500/10 text-rose-400">
+                                <Trash2 className="h-4.5 w-4.5" />
+                            </span>
+                            <h3
+                                id="trash-delete-confirm-title"
+                                className="text-lg font-semibold text-slate-100"
+                            >
+                                确认彻底删除？
+                            </h3>
+                        </div>
+                        <div className="space-y-3 px-6 py-5 text-sm leading-6 text-slate-300">
+                            <p>
+                                将永久删除所选的{' '}
+                                <span className="font-semibold text-rose-300">
+                                    {selectedIds.size}
+                                </span>{' '}
+                                个目录节点及其所有后代。
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                关联的详情内容和图片文件也会一并删除，此操作无法撤销。
+                            </p>
+                        </div>
+                        <div className="border-surface-700 flex justify-end gap-3 border-t bg-slate-900/55 px-6 py-4">
+                            <button
+                                type="button"
+                                disabled={isDeleting}
+                                onClick={() => setIsDeleteConfirmOpen(false)}
+                                className="h-9 cursor-pointer rounded-lg bg-slate-800 px-4 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isDeleting}
+                                onClick={() => void handlePermanentDelete()}
+                                className="flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-medium text-white transition-colors hover:bg-rose-500 disabled:cursor-wait disabled:opacity-65"
+                            >
+                                {isDeleting ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                )}
+                                {isDeleting ? '正在删除' : '确认彻底删除'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>,
         document.body
     )
