@@ -236,20 +236,24 @@ export async function toggleNoteShare(noteId: number): Promise<{ isShared: boole
     }
 }
 
-export async function moveNode(
-    nodeId: number,
-    targetNoteId: number
-): Promise<{ movedCount: number } | null> {
-    const response = await authFetch(`${API_BASE_URL}/noteNodes/move`, {
+export async function moveDetailNode(
+    oldDirectoryNodeId: number,
+    detailNodeId: number,
+    destDirectoryNodeId: number
+): Promise<void> {
+    const response = await authFetch(
+        `${API_BASE_URL}/note/directory/${oldDirectoryNodeId}/detail-nodes/move`,
+        {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, targetNoteId }),
-    })
+            body: JSON.stringify({ detailNodeId, destDirectoryNodeId }),
+        }
+    )
     const res = await response.json()
-    if (res.code === 0) {
-        return res.data as { movedCount: number }
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '详情节点移动失败')
     }
-    return null
 }
 
 export async function uploadUserAvatar(file: File): Promise<string> {

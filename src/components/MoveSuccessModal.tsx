@@ -26,11 +26,11 @@ export default function MoveSuccessModal({ isOpen, onClose, targetNoteId, target
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="border-surface-700 border-b px-6 py-4">
-                    <h3 className="text-lg font-semibold text-slate-100">Moved successfully</h3>
+                    <h3 className="text-lg font-semibold text-slate-100">节点移动成功</h3>
                 </div>
                 <div className="bg-surface-800/50 flex justify-end gap-2 rounded-b-xl px-6 py-4">
-                    <Button onClick={onClose}>Close</Button>
-                    <Button type="primary" onClick={handleGoToCheck}>Go to check</Button>
+                    <Button onClick={onClose}>关闭</Button>
+                    <Button type="primary" onClick={handleGoToCheck}>前往查看</Button>
                 </div>
             </div>
         </div>,

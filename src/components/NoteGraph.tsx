@@ -38,7 +38,7 @@ import {
     getUserProfile,
     IMAGE_BASE_URL,
     importNotesFromJson,
-    moveNode,
+    moveDetailNode,
     toggleNoteShare,
     uploadUserAvatar,
     type ImportStrategy,
@@ -587,8 +587,15 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleNodeMoveTo = () => {
             if (selectedNodeId === null) return
+
+            if (typeof selectedNodeId !== 'number') {
+                setNodeMenuVisible(false)
+                Toast.warning('请先保存新增节点，再执行移动')
+                return
+            }
+
             setNodeMenuVisible(false)
-            setMoveSourceNodeId(selectedNodeId as number)
+            setMoveSourceNodeId(selectedNodeId)
             setIsMoveSearchOpen(true)
         }
 
@@ -690,10 +697,14 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleMoveSelectNote = async (note: Note) => {
             setIsMoveSearchOpen(false)
-            if (moveSourceNodeId === null) return
+            if (moveSourceNodeId === null || !noteDetail) return
 
-            const result = await moveNode(moveSourceNodeId, note.id)
-            if (result) {
+            try {
+                await moveDetailNode(
+                    noteDetail.directoryNodeId,
+                    moveSourceNodeId,
+                    note.id
+                )
                 // Find all descendants to remove from flatTree
                 const descendants = findDescendantsByIdInFlatTree(flatTree, moveSourceNodeId)
                 const allIdsToRemove = new Set([moveSourceNodeId, ...descendants.map((d) => d.id)])
@@ -701,8 +712,11 @@ const NoteGraph = memo<NoteGraphProps>(
                 setFlatTree((prev) => prev.filter((node) => !allIdsToRemove.has(node.id)))
                 setEditMode(false)
                 setMoveSuccessTarget({ id: note.id, label: note.label })
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '详情节点移动失败')
+            } finally {
+                setMoveSourceNodeId(null)
             }
-            setMoveSourceNodeId(null)
         }
 
         const handleNewNodeAddConfirm = () => {
@@ -1884,7 +1898,7 @@ const NoteGraph = memo<NoteGraphProps>(
                             onRestored={onExitEdit}
                         />
                         {/* Move search modal */}
-                        {/* {isMoveSearchOpen && (
+                        {isMoveSearchOpen && (
                             <SearchModal
                                 isOpen={isMoveSearchOpen}
                                 onClose={() => {
@@ -1893,9 +1907,9 @@ const NoteGraph = memo<NoteGraphProps>(
                                 }}
                                 onSelectNote={handleMoveSelectNote}
                                 mode="select"
-                                // excludeNoteId={noteDetail?.noteId}
+                                excludeNoteId={noteDetail?.directoryNodeId}
                             />
-                        )} */}
+                        )}
 
                         {/* Move success modal */}
                         {moveSuccessTarget && (
