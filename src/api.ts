@@ -72,6 +72,10 @@ export interface LoginResult {
     expiresIn: number
 }
 
+export interface OAuthTokenResult {
+    accessToken: string
+}
+
 interface ApiResponse<T> {
     code: number
     message: string
@@ -114,6 +118,12 @@ export async function loginByEmailAndVerificationCode(
         email,
         verificationCode,
     })
+}
+
+export async function exchangeOAuthLoginCode(
+    code: string
+): Promise<ApiResponse<OAuthTokenResult>> {
+    return postAuth<OAuthTokenResult>('/oauth/token', { code })
 }
 
 export async function verifyToken(token: string): Promise<boolean> {

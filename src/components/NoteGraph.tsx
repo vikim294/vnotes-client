@@ -7,6 +7,7 @@ import {
     FileJson,
     Home,
     LoaderCircle,
+    LogOut,
     RotateCcw,
     Search,
     Trash2,
@@ -644,6 +645,11 @@ const NoteGraph = memo<NoteGraphProps>(
             void loadProfile()
         }
 
+        const handleLogout = () => {
+            localStorage.removeItem('vnotes-token')
+            navigate('/login', { replace: true })
+        }
+
         const handleExportNotes = async () => {
             setIsExporting(true)
             try {
@@ -1249,6 +1255,15 @@ const NoteGraph = memo<NoteGraphProps>(
                                 aria-label="打开回收站"
                             >
                                 <Trash2 className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-rose-500/70 hover:text-rose-300"
+                                title="退出登录"
+                                aria-label="退出登录"
+                            >
+                                <LogOut className="h-5 w-5" />
                             </button>
                         </div>
                     )}

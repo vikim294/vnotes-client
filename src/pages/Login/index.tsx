@@ -1,9 +1,11 @@
 import { ArrowRight, KeyRound, LoaderCircle, LockKeyhole, Mail } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import AuthLayout from '../../components/AuthLayout'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Toast } from '../../components/Toast'
 import {
+  API_BASE_URL,
+  exchangeOAuthLoginCode,
   loginByEmailAndPassword,
   loginByEmailAndVerificationCode,
   sendLoginVerificationCode,
@@ -19,7 +21,35 @@ const Login = () => {
   const [countdown, setCountdown] = useState(0)
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [oauthLoginCode] = useState(() => new URLSearchParams(window.location.search).get('loginCode'))
+  const [isExchangingOAuthToken, setIsExchangingOAuthToken] = useState(Boolean(oauthLoginCode))
+  const [isRedirectingToGoogle, setIsRedirectingToGoogle] = useState(false)
+  const oauthExchangeStartedRef = useRef(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!oauthLoginCode || oauthExchangeStartedRef.current) return
+    oauthExchangeStartedRef.current = true
+
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('loginCode')
+    window.history.replaceState(
+      null,
+      '',
+      `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`,
+    )
+
+    void exchangeOAuthLoginCode(oauthLoginCode)
+      .then((res) => {
+        localStorage.setItem('vnotes-token', res.data.accessToken)
+        Toast.success('Google 登录成功')
+        navigate('/', { replace: true })
+      })
+      .catch((error: unknown) => {
+        Toast.warning(error instanceof Error ? error.message : 'Google 登录失败')
+        setIsExchangingOAuthToken(false)
+      })
+  }, [navigate, oauthLoginCode])
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -82,6 +112,27 @@ const Login = () => {
     } finally {
       setIsLoggingIn(false)
     }
+  }
+
+  const handleGoogleLogin = () => {
+    setIsRedirectingToGoogle(true)
+    window.location.assign(`${API_BASE_URL}/oauth/google/login`)
+  }
+
+  if (isExchangingOAuthToken) {
+    return (
+      <AuthLayout
+        eyebrow='Welcome back'
+        title='正在完成登录'
+        description='正在安全地连接你的 VNote 账号。'
+      >
+        <div className='auth-oauth-status' role='status' aria-live='polite'>
+          <LoaderCircle size={28} className='auth-spinner' />
+          <strong>正在验证 Google 登录</strong>
+          <span>即将进入你的笔记空间，请稍候…</span>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
@@ -189,6 +240,24 @@ const Login = () => {
               <ArrowRight size={18} />
             </>
           )}
+        </button>
+
+        <div className='auth-divider' aria-hidden='true'>
+          <span>或</span>
+        </div>
+
+        <button
+          className='auth-google-button'
+          type='button'
+          disabled={isLoggingIn || isRedirectingToGoogle}
+          onClick={handleGoogleLogin}
+        >
+          {isRedirectingToGoogle ? (
+            <LoaderCircle size={18} className='auth-spinner' />
+          ) : (
+            <span className='auth-google-mark' aria-hidden='true'>G</span>
+          )}
+          {isRedirectingToGoogle ? '正在跳转…' : '使用 Google 登录'}
         </button>
       </form>
 
