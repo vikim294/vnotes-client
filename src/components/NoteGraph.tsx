@@ -1455,7 +1455,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     profile={profile}
                                     avatarUrl={
                                         profile.avatarUrl
-                                            ? `${IMAGE_BASE_URL}${profile.avatarUrl}`
+                                            ? `${profile.avatarUrl}`
                                             : null
                                     }
                                     isUploading={isAvatarUploading}
