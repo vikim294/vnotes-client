@@ -266,6 +266,11 @@ export default function NoteNode({
         return;
       }
 
+      // 只接受鼠标左键
+      if(e.button !== 0) {
+        return
+      }
+
       positionData.isDragging = true;
       positionData.startX = e.clientX;
       positionData.startY = e.clientY;
@@ -310,18 +315,29 @@ export default function NoteNode({
       positionData.startY = e.clientY;
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e: PointerEvent) => {
       positionData.isDragging = false;
+
+      if(gElem?.hasPointerCapture(e.pointerId)) {
+        gElem.releasePointerCapture(e.pointerId)
+      }
     };
+
+    // ⭐️ 节点失去鼠标捕获时（如：右键节点打开 menu 及遮罩），更新 isDragging 为 false
+    const onLostPointerCapture = () => {
+      positionData.isDragging = false;
+    }
 
     gElem?.addEventListener("pointerdown", onPointerDown);
     gElem?.addEventListener("pointermove", onPointerMove);
     gElem?.addEventListener("pointerup", onPointerUp);
+    gElem?.addEventListener("lostpointercapture", onLostPointerCapture);
 
     return () => {
       gElem?.removeEventListener("pointerdown", onPointerDown);
       gElem?.removeEventListener("pointermove", onPointerMove);
       gElem?.removeEventListener("pointerup", onPointerUp);
+      gElem?.removeEventListener("lostpointercapture", onLostPointerCapture);
     };
   }, [id, editMode, viewportZoom, flatTree, setFlatTree]);
 
