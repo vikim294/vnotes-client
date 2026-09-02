@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { v4 as uuidv4 } from 'uuid'
 import {
     ArrowLeft,
+    Bell,
     CircleUserRound,
     Download,
     FileJson,
@@ -37,7 +38,6 @@ import {
     authFetch,
     exportNotesAsJson,
     getUserProfile,
-    IMAGE_BASE_URL,
     importNotesFromJson,
     moveDetailNode,
     toggleNoteShare,
@@ -51,6 +51,7 @@ import MoveSuccessModal from '../components/MoveSuccessModal'
 import { toAddedNodeDto, toUpdatedNodeDto } from '../nodeDtos'
 import ProfilePanel from './ProfilePanel'
 import TrashBinModal from './TrashBinModal'
+import NotificationModal from './NotificationModal'
 
 interface GestureInfo {
     type: 'none' | 'panning' | 'pinchAndZoom'
@@ -241,6 +242,7 @@ const NoteGraph = memo<NoteGraphProps>(
         // search modal
         const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
         const [isTrashBinOpen, setIsTrashBinOpen] = useState(false)
+        const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
         // profile
         const {
@@ -1221,6 +1223,15 @@ const NoteGraph = memo<NoteGraphProps>(
                             </button>
                             <button
                                 type="button"
+                                onClick={() => setIsNotificationOpen(true)}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                title="消息通知"
+                                aria-label="打开消息通知"
+                            >
+                                <Bell className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
                                 onClick={openExportModal}
                                 disabled={isExporting}
                                 className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
@@ -1911,6 +1922,10 @@ const NoteGraph = memo<NoteGraphProps>(
                             isOpen={isTrashBinOpen}
                             onClose={() => setIsTrashBinOpen(false)}
                             onRestored={onExitEdit}
+                        />
+                        <NotificationModal
+                            isOpen={isNotificationOpen}
+                            onClose={() => setIsNotificationOpen(false)}
                         />
                         {/* Move search modal */}
                         {isMoveSearchOpen && (

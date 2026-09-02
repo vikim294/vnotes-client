@@ -66,6 +66,15 @@ export interface UserProfile {
     createdAt: string
 }
 
+export interface Notification {
+    id: number
+    type: string
+    title: string
+    content: string
+    hasRead: boolean
+    createdAt: string
+}
+
 export interface LoginResult {
     accessToken: string
     tokenType: string
@@ -292,6 +301,17 @@ export async function getUserProfile(): Promise<UserProfile> {
     }
 
     return res.data as UserProfile
+}
+
+export async function getNotifications(signal?: AbortSignal): Promise<Notification[]> {
+    const response = await authFetch(`${API_BASE_URL}/notification`, { signal })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+        throw new Error(res.message || '消息通知加载失败')
+    }
+
+    return res.data as Notification[]
 }
 
 export async function exportNotesAsJson(): Promise<{ blob: Blob; filename: string }> {
