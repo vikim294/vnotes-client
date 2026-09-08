@@ -11,6 +11,7 @@ import {
     LogOut,
     RotateCcw,
     Search,
+    Tags,
     Trash2,
     Upload,
 } from 'lucide-react'
@@ -37,6 +38,8 @@ import {
     API_BASE_URL,
     authFetch,
     exportNotesAsJson,
+    getDirectoryTags,
+    getTags,
     getUserProfile,
     importNotesFromJson,
     moveDetailNode,
@@ -44,6 +47,7 @@ import {
     uploadUserAvatar,
     type ImportStrategy,
     type Note,
+    type Tag,
     type UserProfile,
 } from '../api'
 import FilePicker from './FilePicker'
@@ -52,6 +56,9 @@ import { toAddedNodeDto, toUpdatedNodeDto } from '../nodeDtos'
 import ProfilePanel from './ProfilePanel'
 import TrashBinModal from './TrashBinModal'
 import NotificationModal from './NotificationModal'
+import TagManagementModal from './TagManagementModal'
+import DirectoryTags from './DirectoryTags'
+import TagCheckboxGroup from './TagCheckboxGroup'
 
 interface GestureInfo {
     type: 'none' | 'panning' | 'pinchAndZoom'
@@ -164,6 +171,12 @@ const NoteGraph = memo<NoteGraphProps>(
         }, [flatTree, selectedNodeId])
         // detail node is only for directory graph
         const [nodeType, setNodeType] = useState<NodeType>('DIRECTORY')
+        const [selectableTags, setSelectableTags] = useState<Tag[]>([])
+        const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
+        const [isTagSelectionLoading, setIsTagSelectionLoading] = useState(false)
+        const [tagSelectionError, setTagSelectionError] = useState<string | null>(null)
+        const [isTagSelectionReady, setIsTagSelectionReady] = useState(false)
+        const tagSelectionRequestRef = useRef<AbortController | null>(null)
 
         // add new node
         const {
@@ -243,6 +256,7 @@ const NoteGraph = memo<NoteGraphProps>(
         const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
         const [isTrashBinOpen, setIsTrashBinOpen] = useState(false)
         const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+        const [isTagManagementOpen, setIsTagManagementOpen] = useState(false)
 
         // profile
         const {
@@ -309,9 +323,74 @@ const NoteGraph = memo<NoteGraphProps>(
             ]
         )
 
+        const resetTagSelection = () => {
+            tagSelectionRequestRef.current?.abort()
+            tagSelectionRequestRef.current = null
+            setSelectableTags([])
+            setSelectedTagIds([])
+            setIsTagSelectionLoading(false)
+            setTagSelectionError(null)
+            setIsTagSelectionReady(false)
+        }
+
+        const loadTagSelection = async (
+            directoryNodeId?: number,
+            fallbackSelectedTagIds: number[] = []
+        ) => {
+            tagSelectionRequestRef.current?.abort()
+            const controller = new AbortController()
+            tagSelectionRequestRef.current = controller
+
+            setSelectedTagIds(fallbackSelectedTagIds)
+            setIsTagSelectionLoading(true)
+            setTagSelectionError(null)
+            setIsTagSelectionReady(false)
+
+            try {
+                const [tags, directoryTags] = await Promise.all([
+                    getTags(controller.signal),
+                    directoryNodeId === undefined
+                        ? Promise.resolve<Tag[]>([])
+                        : getDirectoryTags(directoryNodeId, controller.signal),
+                ])
+
+                if (controller.signal.aborted) return
+                setSelectableTags(tags)
+                setSelectedTagIds(
+                    directoryNodeId === undefined
+                        ? fallbackSelectedTagIds
+                        : directoryTags.map((tag) => tag.id)
+                )
+                setIsTagSelectionReady(true)
+            } catch (loadError) {
+                if (loadError instanceof DOMException && loadError.name === 'AbortError') return
+                setSelectableTags([])
+                setTagSelectionError(
+                    loadError instanceof Error ? loadError.message : '标签列表加载失败'
+                )
+            } finally {
+                if (!controller.signal.aborted) setIsTagSelectionLoading(false)
+            }
+        }
+
+        const handleDirectoryNodeTypeChange = (isDetail: boolean) => {
+            setNodeType(isDetail ? 'DETAIL' : 'DIRECTORY')
+            if (isDetail) void loadTagSelection()
+            else resetTagSelection()
+        }
+
+        const toggleSelectedTag = (tagId: number) => {
+            setSelectedTagIds((current) =>
+                current.includes(tagId)
+                    ? current.filter((id) => id !== tagId)
+                    : [...current, tagId]
+            )
+        }
+
         const handleAddNewNode = () => {
             setNodeEditContent('')
             setNodeType('DIRECTORY')
+            resetTagSelection()
             setNodeContentType('TEXT')
             setTempFileUrl(null)
             setTempImageSize(null)
@@ -490,11 +569,21 @@ const NoteGraph = memo<NoteGraphProps>(
         }
 
         const handleNodeEdit = () => {
+            const nodeToEdit = flatTree.find((node) => node.id === selectedNodeId)
             // show the current value
-            setNodeEditContent(flatTree.find((node) => node.id === selectedNodeId)?.label ?? '')
+            setNodeEditContent(nodeToEdit?.label ?? '')
             setTempFileUrl(null)
             if (selectedNode?.contentType === 'IMAGE') {
                 setNodeContentType('IMAGE')
+            }
+
+            if (graphType === 'directory' && nodeToEdit?.nodeType === 'DETAIL') {
+                void loadTagSelection(
+                    typeof nodeToEdit.id === 'number' ? nodeToEdit.id : undefined,
+                    nodeToEdit.tagIds ?? []
+                )
+            } else {
+                resetTagSelection()
             }
             openNodeEditModal()
         }
@@ -502,6 +591,7 @@ const NoteGraph = memo<NoteGraphProps>(
         const handleNodeAddChild = () => {
             setNodeEditContent('')
             setNodeType('DIRECTORY')
+            resetTagSelection()
             setNodeContentType('TEXT')
             setTempFileUrl(null)
             setTempImageSize(null)
@@ -728,6 +818,11 @@ const NoteGraph = memo<NoteGraphProps>(
         }
 
         const handleNewNodeAddConfirm = () => {
+            if (graphType === 'directory' && nodeType === 'DETAIL' && isTagSelectionLoading) {
+                Toast.warning('标签正在加载，请稍候')
+                return
+            }
+
             if (nodeContentType === 'IMAGE' && (!tempFileRef.current || !tempImageSize)) {
                 Toast.error('请上传图片后再确认')
                 return
@@ -746,6 +841,12 @@ const NoteGraph = memo<NoteGraphProps>(
                 markType: graphType === 'detail' ? null : undefined,
                 // directory graph only
                 nodeType,
+                tagIds:
+                    graphType === 'directory' &&
+                    nodeType === 'DETAIL' &&
+                    isTagSelectionReady
+                        ? [...selectedTagIds]
+                        : undefined,
                 contentType: nodeContentType,
                 isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
                 imageUrl: nodeContentType === 'IMAGE' ? (tempFileUrl ?? undefined) : undefined,
@@ -760,12 +861,21 @@ const NoteGraph = memo<NoteGraphProps>(
 
             setFlatTree((prev) => [...prev, newNode])
 
+            resetTagSelection()
             closeNewNodeAddModal()
         }
 
         const handleNodeEditConfirm = () => {
             if (!selectedNodeId) return
             if (selectedNode?.contentType === 'IMAGE') return
+            if (
+                graphType === 'directory' &&
+                selectedNode?.nodeType === 'DETAIL' &&
+                isTagSelectionLoading
+            ) {
+                Toast.warning('标签正在加载，请稍候')
+                return
+            }
 
             setFlatTree((prev) => {
                 const res = prev.map((node) => {
@@ -773,6 +883,12 @@ const NoteGraph = memo<NoteGraphProps>(
                         const newNode: NodeData = {
                             ...node,
                             label: nodeEditContent,
+                            tagIds:
+                                graphType === 'directory' && node.nodeType === 'DETAIL'
+                                    ? isTagSelectionReady
+                                        ? [...selectedTagIds]
+                                        : node.tagIds
+                                    : undefined,
                             opStatus: node.opStatus === 'new' ? 'new' : 'edited',
                         }
                         return newNode
@@ -782,12 +898,17 @@ const NoteGraph = memo<NoteGraphProps>(
                 return res
             })
 
+            resetTagSelection()
             closeNodeEditModal()
             handleNodeMenuClose()
         }
 
         const handleNodeAddConfirm = () => {
             if (!selectedNodeId) return
+            if (graphType === 'directory' && nodeType === 'DETAIL' && isTagSelectionLoading) {
+                Toast.warning('标签正在加载，请稍候')
+                return
+            }
             if (nodeContentType === 'IMAGE' && (!tempFileRef.current || !tempImageSize)) {
                 Toast.error('请上传图片后再确认')
                 return
@@ -813,6 +934,12 @@ const NoteGraph = memo<NoteGraphProps>(
                     markType: graphType === 'detail' ? null : undefined,
                     // directory graph only
                     nodeType,
+                    tagIds:
+                        graphType === 'directory' &&
+                        nodeType === 'DETAIL' &&
+                        isTagSelectionReady
+                            ? [...selectedTagIds]
+                            : undefined,
                     contentType: nodeContentType,
                     isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
                     imageUrl: nodeContentType === 'IMAGE' ? (tempFileUrl ?? undefined) : undefined,
@@ -833,6 +960,12 @@ const NoteGraph = memo<NoteGraphProps>(
                     markType: graphType === 'detail' ? null : undefined,
                     // directory graph only
                     nodeType,
+                    tagIds:
+                        graphType === 'directory' &&
+                        nodeType === 'DETAIL' &&
+                        isTagSelectionReady
+                            ? [...selectedTagIds]
+                            : undefined,
                     contentType: nodeContentType,
                     isTempImageUrl: nodeContentType === 'IMAGE' ? true : undefined,
                     imageUrl: nodeContentType === 'IMAGE' ? (tempFileUrl ?? undefined) : undefined,
@@ -848,6 +981,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
             setFlatTree((prev) => [...prev, newNode])
 
+            resetTagSelection()
             closeNodeAddModal()
             handleNodeMenuClose()
         }
@@ -1207,6 +1341,9 @@ const NoteGraph = memo<NoteGraphProps>(
                                 <Home className="h-5 w-5" />
                             </button>
                             <span className="text-[#ffffff5c]">{noteTitle}</span>
+                            {graphType === 'detail' && noteDetail && (
+                                <DirectoryTags directoryNodeId={noteDetail.directoryNodeId} />
+                            )}
                         </div>
                     )}
 
@@ -1229,6 +1366,15 @@ const NoteGraph = memo<NoteGraphProps>(
                                 aria-label="打开消息通知"
                             >
                                 <Bell className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsTagManagementOpen(true)}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                title="标签管理"
+                                aria-label="打开标签管理"
+                            >
+                                <Tags className="h-5 w-5" />
                             </button>
                             <button
                                 type="button"
@@ -1736,12 +1882,19 @@ const NoteGraph = memo<NoteGraphProps>(
                                             <input
                                                 type="checkbox"
                                                 checked={nodeType === 'DETAIL'}
-                                                onChange={(e) => setNodeType(e.target.checked ? 'DETAIL' : 'DIRECTORY')}
+                                                onChange={(e) => handleDirectoryNodeTypeChange(e.target.checked)}
                                             />
                                             detail node
                                         </label>
                                     )}
-                                    <Button onClick={closeNewNodeAddModal}>取消</Button>
+                                    <Button
+                                        onClick={() => {
+                                            resetTagSelection()
+                                            closeNewNodeAddModal()
+                                        }}
+                                    >
+                                        取消
+                                    </Button>
                                     <Button type="primary" onClick={handleNewNodeAddConfirm}>
                                         确认
                                     </Button>
@@ -1790,6 +1943,16 @@ const NoteGraph = memo<NoteGraphProps>(
                                     </>
                                 )}
                             </div>
+                            {graphType === 'directory' && nodeType === 'DETAIL' && (
+                                <TagCheckboxGroup
+                                    tags={selectableTags}
+                                    selectedTagIds={selectedTagIds}
+                                    isLoading={isTagSelectionLoading}
+                                    error={tagSelectionError}
+                                    onToggle={toggleSelectedTag}
+                                    onRetry={() => void loadTagSelection()}
+                                />
+                            )}
                         </NewNodeAddModal>
 
                         <NodeEditModal
@@ -1797,7 +1960,14 @@ const NoteGraph = memo<NoteGraphProps>(
                             header="编辑结点"
                             footer={
                                 <div className="flex items-center gap-4">
-                                    <Button onClick={closeNodeEditModal}>取消</Button>
+                                    <Button
+                                        onClick={() => {
+                                            resetTagSelection()
+                                            closeNodeEditModal()
+                                        }}
+                                    >
+                                        取消
+                                    </Button>
                                     <Button type="primary" onClick={handleNodeEditConfirm}>
                                         确认
                                     </Button>
@@ -1815,6 +1985,24 @@ const NoteGraph = memo<NoteGraphProps>(
                                 />
                             )}
 
+                            {graphType === 'directory' && selectedNode?.nodeType === 'DETAIL' && (
+                                <TagCheckboxGroup
+                                    tags={selectableTags}
+                                    selectedTagIds={selectedTagIds}
+                                    isLoading={isTagSelectionLoading}
+                                    error={tagSelectionError}
+                                    onToggle={toggleSelectedTag}
+                                    onRetry={() =>
+                                        void loadTagSelection(
+                                            typeof selectedNode.id === 'number'
+                                                ? selectedNode.id
+                                                : undefined,
+                                            selectedNode.tagIds ?? []
+                                        )
+                                    }
+                                />
+                            )}
+
                         </NodeEditModal>
 
                         <NodeAddModal
@@ -1827,12 +2015,19 @@ const NoteGraph = memo<NoteGraphProps>(
                                             <input
                                                 type="checkbox"
                                                 checked={nodeType === 'DETAIL'}
-                                                onChange={(e) => setNodeType(e.target.checked ? 'DETAIL' : 'DIRECTORY')}
+                                                onChange={(e) => handleDirectoryNodeTypeChange(e.target.checked)}
                                             />
                                             detail node
                                         </label>
                                     )}
-                                    <Button onClick={closeNodeAddModal}>取消</Button>
+                                    <Button
+                                        onClick={() => {
+                                            resetTagSelection()
+                                            closeNodeAddModal()
+                                        }}
+                                    >
+                                        取消
+                                    </Button>
                                     <Button type="primary" onClick={handleNodeAddConfirm}>
                                         确认
                                     </Button>
@@ -1881,6 +2076,16 @@ const NoteGraph = memo<NoteGraphProps>(
                                     </>
                                 )}
                             </div>
+                            {graphType === 'directory' && nodeType === 'DETAIL' && (
+                                <TagCheckboxGroup
+                                    tags={selectableTags}
+                                    selectedTagIds={selectedTagIds}
+                                    isLoading={isTagSelectionLoading}
+                                    error={tagSelectionError}
+                                    onToggle={toggleSelectedTag}
+                                    onRetry={() => void loadTagSelection()}
+                                />
+                            )}
                         </NodeAddModal>
 
                         <NodeDeleteConfirmModal
@@ -1926,6 +2131,10 @@ const NoteGraph = memo<NoteGraphProps>(
                         <NotificationModal
                             isOpen={isNotificationOpen}
                             onClose={() => setIsNotificationOpen(false)}
+                        />
+                        <TagManagementModal
+                            isOpen={isTagManagementOpen}
+                            onClose={() => setIsTagManagementOpen(false)}
                         />
                         {/* Move search modal */}
                         {isMoveSearchOpen && (

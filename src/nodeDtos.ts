@@ -36,6 +36,7 @@ export const toAddedNodeDto = (node: NodeData): AddedNodeDto => {
         uuid: node.uuid,
         nodeType: node.nodeType,
         contentType: node.contentType,
+        tagIds: node.nodeType === 'DETAIL' ? node.tagIds : undefined,
         ...getParentReference(node),
     }
 }
@@ -48,6 +49,7 @@ export const toUpdatedNodeDto = (node: NodeData): UpdatedNodeDto => {
     return {
         ...getMutationFields(node),
         id: node.id,
+        tagIds: node.nodeType === 'DETAIL' ? node.tagIds : undefined,
         ...getParentReference(node),
     }
 }

@@ -10,14 +10,18 @@ import {
     RotateCcw,
     Search,
     SlidersHorizontal,
+    Tag as TagIcon,
     X,
 } from 'lucide-react'
 import {
+    getTags,
     searchDirectoryNodes,
     type Note,
     type PageResponse,
+    type Tag,
 } from '../api'
 import type { NodeType } from '../types'
+import TagCheckboxGroup from './TagCheckboxGroup'
 
 interface SearchModalProps {
     isOpen: boolean
@@ -67,6 +71,11 @@ export default function SearchModal({
     )
     const [startDate, setStartDate] = useState('')
     const [endDate, setEndDate] = useState('')
+    const [tags, setTags] = useState<Tag[]>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
+    const [isTagsLoading, setIsTagsLoading] = useState(false)
+    const [tagsError, setTagsError] = useState<string | null>(null)
+    const [tagsRefreshKey, setTagsRefreshKey] = useState(0)
     const [page, setPage] = useState(1)
     const [result, setResult] = useState<PageResponse<Note>>(EMPTY_PAGE)
     const [isLoading, setIsLoading] = useState(false)
@@ -84,6 +93,42 @@ export default function SearchModal({
 
         const controller = new AbortController()
         const timer = window.setTimeout(() => {
+            setIsTagsLoading(true)
+            setTagsError(null)
+
+            void getTags(controller.signal)
+                .then(setTags)
+                .catch((requestError: unknown) => {
+                    if (
+                        requestError instanceof DOMException &&
+                        requestError.name === 'AbortError'
+                    ) {
+                        return
+                    }
+
+                    setTags([])
+                    setTagsError(
+                        requestError instanceof Error
+                            ? requestError.message
+                            : '标签列表加载失败'
+                    )
+                })
+                .finally(() => {
+                    if (!controller.signal.aborted) setIsTagsLoading(false)
+                })
+        }, 0)
+
+        return () => {
+            window.clearTimeout(timer)
+            controller.abort()
+        }
+    }, [isOpen, tagsRefreshKey])
+
+    useEffect(() => {
+        if (!isOpen) return
+
+        const controller = new AbortController()
+        const timer = window.setTimeout(() => {
             setIsLoading(true)
             setError(null)
 
@@ -91,6 +136,7 @@ export default function SearchModal({
                 {
                     keyword: debouncedQuery,
                     nodeType: mode === 'select' ? 'DETAIL' : nodeType || undefined,
+                    tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
                     startTime: startDate ? `${startDate}T00:00:00` : undefined,
                     endTime: endDate ? `${endDate}T23:59:59` : undefined,
                     page,
@@ -118,7 +164,7 @@ export default function SearchModal({
             window.clearTimeout(timer)
             controller.abort()
         }
-    }, [debouncedQuery, endDate, isOpen, mode, nodeType, page, startDate])
+    }, [debouncedQuery, endDate, isOpen, mode, nodeType, page, selectedTagIds, startDate])
 
     useEffect(() => {
         if (!isOpen) return
@@ -143,12 +189,16 @@ export default function SearchModal({
     const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize))
     const pageItems = getPageItems(page, totalPages)
     const activeFilterCount =
-        (mode !== 'select' && nodeType ? 1 : 0) + (startDate ? 1 : 0) + (endDate ? 1 : 0)
+        (mode !== 'select' && nodeType ? 1 : 0) +
+        (selectedTagIds.length > 0 ? 1 : 0) +
+        (startDate ? 1 : 0) +
+        (endDate ? 1 : 0)
 
     const resetPage = () => setPage(1)
 
     const resetFilters = () => {
         setNodeType(mode === 'select' ? 'DETAIL' : '')
+        setSelectedTagIds([])
         setStartDate('')
         setEndDate('')
         resetPage()
@@ -158,6 +208,7 @@ export default function SearchModal({
         setQuery('')
         setDebouncedQuery('')
         setNodeType(mode === 'select' ? 'DETAIL' : '')
+        setSelectedTagIds([])
         setStartDate('')
         setEndDate('')
         setPage(1)
@@ -309,6 +360,22 @@ export default function SearchModal({
                             />
                         </label>
                     </div>
+
+                    <TagCheckboxGroup
+                        tags={tags}
+                        selectedTagIds={selectedTagIds}
+                        isLoading={isTagsLoading}
+                        error={tagsError}
+                        onToggle={(tagId) => {
+                            setSelectedTagIds((current) =>
+                                current.includes(tagId)
+                                    ? current.filter((id) => id !== tagId)
+                                    : [...current, tagId]
+                            )
+                            resetPage()
+                        }}
+                        onRetry={() => setTagsRefreshKey((current) => current + 1)}
+                    />
                 </div>
 
                 <div className="min-h-64 flex-1 overflow-y-auto">
@@ -340,6 +407,20 @@ export default function SearchModal({
                                             <span className="mt-0.5 block text-xs text-slate-500">
                                                 {new Date(note.createdAt).toLocaleDateString('zh-CN')}
                                             </span>
+                                            {note.tags && note.tags.length > 0 && (
+                                                <span className="mt-2 flex flex-wrap gap-1.5">
+                                                    {note.tags.map((tag) => (
+                                                        <span
+                                                            key={tag.id}
+                                                            title={tag.name}
+                                                            className="inline-flex max-w-36 items-center gap-1 rounded-full border border-indigo-400/20 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-200/80"
+                                                        >
+                                                            <TagIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                            <span className="truncate">{tag.name}</span>
+                                                        </span>
+                                                    ))}
+                                                </span>
+                                            )}
                                         </span>
                                         <span
                                             className={`rounded-full px-2 py-0.5 text-xs ${

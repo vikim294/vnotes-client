@@ -27,6 +27,7 @@ export interface Note {
     y: number
     parentId: number | null
     nodeType: NodeType
+    tags?: Tag[]
     createdAt: string
     updatedAt: string
 }
@@ -45,6 +46,7 @@ export interface TrashBinDirectoryNode {
 export interface DirectorySearchParams {
     keyword?: string
     nodeType?: NodeType
+    tagIds?: number[]
     startTime?: string
     endTime?: string
     page: number
@@ -73,6 +75,12 @@ export interface Notification {
     content: string
     hasRead: boolean
     createdAt: string
+}
+
+export interface Tag {
+    id: number
+    name: string
+    createdAt?: string
 }
 
 export interface LoginResult {
@@ -161,6 +169,7 @@ export async function searchDirectoryNodes(
 
     if (params.keyword?.trim()) searchParams.set('keyword', params.keyword.trim())
     if (params.nodeType) searchParams.set('nodeType', params.nodeType)
+    params.tagIds?.forEach((tagId) => searchParams.append('tagIds', String(tagId)))
     if (params.startTime) searchParams.set('startTime', params.startTime)
     if (params.endTime) searchParams.set('endTime', params.endTime)
 
@@ -312,6 +321,71 @@ export async function getNotifications(signal?: AbortSignal): Promise<Notificati
     }
 
     return res.data as Notification[]
+}
+
+export async function getTags(signal?: AbortSignal): Promise<Tag[]> {
+    const response = await authFetch(`${API_BASE_URL}/tag`, { signal })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+        throw new Error(res.message || '标签列表加载失败')
+    }
+
+    return res.data as Tag[]
+}
+
+export async function createTag(name: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/tag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '标签创建失败')
+    }
+}
+
+export async function renameTag(id: number, name: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/tag`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name }),
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '标签重命名失败')
+    }
+}
+
+export async function deleteTag(id: number): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/tag/${id}`, {
+        method: 'DELETE',
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '标签删除失败')
+    }
+}
+
+export async function getDirectoryTags(
+    directoryNodeId: number,
+    signal?: AbortSignal
+): Promise<Tag[]> {
+    const response = await authFetch(
+        `${API_BASE_URL}/note/directory/${directoryNodeId}/tag`,
+        { signal }
+    )
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+        throw new Error(res.message || '笔记标签加载失败')
+    }
+
+    return res.data as Tag[]
 }
 
 export async function exportNotesAsJson(): Promise<{ blob: Blob; filename: string }> {

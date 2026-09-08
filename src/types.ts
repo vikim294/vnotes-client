@@ -19,6 +19,7 @@ export interface NodeData {
   imageUrl?: string;
   imageWidth?: number;
   imageHeight?: number;
+  tagIds?: number[];
 }
 
 export type NodeType = "DIRECTORY" | "DETAIL";
@@ -42,6 +43,7 @@ export interface AddedNodeDto extends NodeMutationFields {
   parentUuid?: string | null;
   nodeType?: NodeType;
   contentType?: NodeContentType;
+  tagIds?: number[];
 }
 
 /** 更新已有节点接口参数。id 和 parentId 只允许使用数据库数字 ID。 */
@@ -49,6 +51,7 @@ export interface UpdatedNodeDto extends NodeMutationFields {
   id: number;
   parentId?: number | null;
   parentUuid?: string | null;
+  tagIds?: number[];
 }
 
 export interface BatchUpdateNodesDto {
