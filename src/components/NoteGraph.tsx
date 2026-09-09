@@ -4,6 +4,7 @@ import {
     ArrowLeft,
     Bell,
     CircleUserRound,
+    Copy,
     Download,
     FileJson,
     Home,
@@ -44,7 +45,8 @@ import {
     getUserProfile,
     importNotesFromJson,
     moveDetailNode,
-    toggleNoteShare,
+    shareNote,
+    unshareNote,
     uploadUserAvatar,
     type ImportStrategy,
     type Note,
@@ -58,7 +60,7 @@ import ProfilePanel from './ProfilePanel'
 import TrashBinModal from './TrashBinModal'
 import NotificationModal from './NotificationModal'
 import TagManagementModal from './TagManagementModal'
-import DirectoryTags from './DirectoryTags'
+import DirectoryTags, { NoteTagList } from './DirectoryTags'
 import TagCheckboxGroup from './TagCheckboxGroup'
 
 interface GestureInfo {
@@ -77,7 +79,9 @@ interface GestureInfo {
 
 interface NoteGraphProps {
     graphType: 'directory' | 'detail'
+    viewMode?: 'owner' | 'shared'
     noteTitle?: string
+    noteTags?: Tag[]
     noteDetail?: NoteDetailData | null
     flatTree: NodeData[]
     setFlatTree: React.Dispatch<React.SetStateAction<NodeData[]>>
@@ -87,6 +91,7 @@ interface NoteGraphProps {
 
 const VIEWPORT_STORAGE_KEY = 'vnote-directory-viewport'
 const NODE_LABEL_MAX_LENGTH = 8192
+const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
 
 const loadViewportState = () => {
     try {
@@ -111,7 +116,9 @@ const saveViewportState = (viewport: { x: number; y: number; zoom: number }) => 
 const NoteGraph = memo<NoteGraphProps>(
     ({
         graphType,
+        viewMode = 'owner',
         noteTitle,
+        noteTags = [],
         noteDetail,
         flatTree,
         setFlatTree,
@@ -119,6 +126,7 @@ const NoteGraph = memo<NoteGraphProps>(
         allowOperate = true,
     }) => {
         const navigate = useNavigate()
+        const isSharedView = viewMode === 'shared'
         const hasMountedRef = useRef(false)
 
         const [paperSize, setPaperSize] = useState({ width: 0, height: 0 })
@@ -245,6 +253,14 @@ const NoteGraph = memo<NoteGraphProps>(
             closeModal: closeNodeMarkModal,
         } = useModal()
         const [markValue, setMarkValue] = useState<MarkType>(null)
+
+        // share note
+        const {
+            Modal: ShareNoteModal,
+            openModal: openShareNoteModal,
+            closeModal: closeShareNoteModal,
+        } = useModal()
+        const [shareLink, setShareLink] = useState('')
 
         // exit confirmation modal
         const {
@@ -652,23 +668,58 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleNodeToggleShare = async () => {
             const nodeId = selectedNode?.id
-            if (!nodeId || typeof nodeId !== 'number') return
+            if (
+                !nodeId ||
+                typeof nodeId !== 'number' ||
+                graphType !== 'directory' ||
+                selectedNode?.nodeType !== 'DETAIL'
+            ) {
+                return
+            }
 
-            const result = await toggleNoteShare(nodeId)
-            if (result) {
+            const wasShared = selectedNode.shared === true
+            handleNodeMenuClose()
+
+            try {
+                if (wasShared) {
+                    await unshareNote(nodeId)
+                    setFlatTree((prev) =>
+                        prev.map((node) =>
+                            node.id === nodeId ? { ...node, shared: false } : node
+                        )
+                    )
+                    Toast.success('已取消分享')
+                    return
+                }
+
+                const shareToken = await shareNote(nodeId)
                 setFlatTree((prev) => {
                     return prev.map((node) => {
-                        if (node.id === selectedNodeId) {
+                        if (node.id === nodeId) {
                             return {
                                 ...node,
-                                isShared: result.isShared,
+                                shared: true,
                             }
                         }
                         return node
                     })
                 })
+                setShareLink(`${SHARE_NOTE_BASE_URL}/${encodeURIComponent(shareToken)}`)
+                openShareNoteModal()
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '分享状态更新失败')
             }
-            handleNodeMenuClose()
+        }
+
+        const handleCopyShareLink = async () => {
+            if (!shareLink) return
+
+            try {
+                await navigator.clipboard.writeText(shareLink)
+                Toast.success('分享链接已复制')
+            } catch {
+                Toast.error('复制失败，请手动复制链接')
+            }
         }
 
         const handleNodeDelete = () => {
@@ -1326,23 +1377,34 @@ const NoteGraph = memo<NoteGraphProps>(
                         <NoteTree flatTree={flatTree} />
                     </svg>
                     {noteTitle && (
-                        <div className="fixed top-0 left-0 flex items-center gap-2 select-none">
-                            <button
-                                onClick={() => navigate(-1)}
-                                className="cursor-pointer p-1 text-[#ffffff5c] transition-colors hover:text-white"
-                                title="Go back"
-                            >
-                                <ArrowLeft className="h-5 w-5" />
-                            </button>
-                            <button
-                                onClick={() => navigate('/')}
-                                className="cursor-pointer p-1 text-[#ffffff5c] transition-colors hover:text-white"
-                                title="Go to directory"
-                            >
-                                <Home className="h-5 w-5" />
-                            </button>
+                        <div
+                            className={`fixed flex items-center gap-2 select-none ${
+                                isSharedView ? 'top-4 left-4' : 'top-0 left-0'
+                            }`}
+                        >
+                            {!isSharedView && (
+                                <>
+                                    <button
+                                        onClick={() => navigate(-1)}
+                                        className="cursor-pointer p-1 text-[#ffffff5c] transition-colors hover:text-white"
+                                        title="Go back"
+                                    >
+                                        <ArrowLeft className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/')}
+                                        className="cursor-pointer p-1 text-[#ffffff5c] transition-colors hover:text-white"
+                                        title="Go to directory"
+                                    >
+                                        <Home className="h-5 w-5" />
+                                    </button>
+                                </>
+                            )}
                             <span className="text-[#ffffff5c]">{noteTitle}</span>
-                            {graphType === 'detail' && noteDetail && (
+                            {graphType === 'detail' && isSharedView && (
+                                <NoteTagList tags={noteTags} />
+                            )}
+                            {graphType === 'detail' && !isSharedView && noteDetail && (
                                 <DirectoryTags directoryNodeId={noteDetail.directoryNodeId} />
                             )}
                         </div>
@@ -1426,19 +1488,21 @@ const NoteGraph = memo<NoteGraphProps>(
                         </div>
                     )}
 
-                    <div className="fixed top-4 right-4 select-none">
-                        <button
-                            type="button"
-                            onClick={resetView}
-                            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
-                            title="重置视图"
-                            aria-label="重置视图"
-                        >
-                            <RotateCcw className="h-5 w-5" />
-                        </button>
-                    </div>
+                    {!isSharedView && (
+                        <div className="fixed top-4 right-4 select-none">
+                            <button
+                                type="button"
+                                onClick={resetView}
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                title="重置视图"
+                                aria-label="重置视图"
+                            >
+                                <RotateCcw className="h-5 w-5" />
+                            </button>
+                        </div>
+                    )}
 
-                    {!isChoosingParent && chosenParentNodeId === null && (
+                    {!isSharedView && !isChoosingParent && chosenParentNodeId === null && (
                         <div className="fixed top-25 right-0 w-36">
                             {!isSaving && (
                                 <div>
@@ -1517,19 +1581,21 @@ const NoteGraph = memo<NoteGraphProps>(
                     )}
 
                     {/* node menu */}
-                    <NodeMenu
-                        ref={nodeMenuRef}
-                        visible={nodeMenuVisible}
-                        onEdit={handleNodeEdit}
-                        onAddChild={handleNodeAddChild}
-                        onSetParent={handleNodeSetParent}
-                        onDisconnectFromParent={handleNodeDisconnectFromParent}
-                        onOpenMark={handleNodeOpenMark}
-                        onToggleShare={handleNodeToggleShare}
-                        onMoveTo={handleNodeMoveTo}
-                        onDelete={handleNodeDelete}
-                        onClose={handleNodeMenuClose}
-                    />
+                    {!isSharedView && (
+                        <NodeMenu
+                            ref={nodeMenuRef}
+                            visible={nodeMenuVisible}
+                            onEdit={handleNodeEdit}
+                            onAddChild={handleNodeAddChild}
+                            onSetParent={handleNodeSetParent}
+                            onDisconnectFromParent={handleNodeDisconnectFromParent}
+                            onOpenMark={handleNodeOpenMark}
+                            onToggleShare={handleNodeToggleShare}
+                            onMoveTo={handleNodeMoveTo}
+                            onDelete={handleNodeDelete}
+                            onClose={handleNodeMenuClose}
+                        />
+                    )}
 
                     {/* choosing a parent node */}
                     {isChoosingParent && chosenParentNodeId === null && (
@@ -1797,6 +1863,35 @@ const NoteGraph = memo<NoteGraphProps>(
                                 )}
                             </div>
                         </ImportModal>
+
+                        <ShareNoteModal
+                            width={620}
+                            header="分享笔记"
+                            closeOnClickMask
+                            footer={<Button onClick={closeShareNoteModal}>关闭</Button>}
+                        >
+                            <p className="mb-3 text-sm text-slate-400">
+                                任何获得此链接的人都可以访问这篇笔记
+                            </p>
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={shareLink}
+                                    aria-label="分享链接"
+                                    className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                                    onFocus={(event) => event.currentTarget.select()}
+                                />
+                                <Button
+                                    type="primary"
+                                    className="gap-2"
+                                    onClick={() => void handleCopyShareLink()}
+                                >
+                                    <Copy className="h-4 w-4" aria-hidden="true" />
+                                    复制链接
+                                </Button>
+                            </div>
+                        </ShareNoteModal>
 
                         <NodeMarkModal
                             width={420}

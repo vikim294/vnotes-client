@@ -6,6 +6,29 @@ interface DirectoryTagsProps {
     directoryNodeId: number
 }
 
+interface NoteTagListProps {
+    tags: Tag[]
+}
+
+export function NoteTagList({ tags }: NoteTagListProps) {
+    if (tags.length === 0) return null
+
+    return (
+        <div className="flex max-w-[min(56vw,720px)] flex-wrap items-center gap-1.5" aria-label="笔记标签">
+            {tags.map((tag) => (
+                <span
+                    key={tag.id}
+                    title={tag.name}
+                    className="inline-flex max-w-40 items-center gap-1 rounded-full border border-indigo-400/20 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-200/80"
+                >
+                    <TagIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{tag.name}</span>
+                </span>
+            ))}
+        </div>
+    )
+}
+
 export default function DirectoryTags({ directoryNodeId }: DirectoryTagsProps) {
     const [tags, setTags] = useState<Tag[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -60,20 +83,5 @@ export default function DirectoryTags({ directoryNodeId }: DirectoryTagsProps) {
         )
     }
 
-    if (tags.length === 0) return null
-
-    return (
-        <div className="flex max-w-[min(56vw,720px)] flex-wrap items-center gap-1.5" aria-label="笔记标签">
-            {tags.map((tag) => (
-                <span
-                    key={tag.id}
-                    title={tag.name}
-                    className="inline-flex max-w-40 items-center gap-1 rounded-full border border-indigo-400/20 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-200/80"
-                >
-                    <TagIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{tag.name}</span>
-                </span>
-            ))}
-        </div>
-    )
+    return <NoteTagList tags={tags} />
 }

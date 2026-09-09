@@ -37,7 +37,7 @@ export default function NoteNode({
   // expanded,
   markType,
   nodeType,
-  isShared,
+  shared,
   contentType,
   imageUrl,
   isTempImageUrl,
@@ -405,7 +405,7 @@ export default function NoteNode({
           label={label}
           markType={markType}
           nodeType={nodeType}
-          isShared={isShared}
+          shared={shared}
           size={nodeSize}
           setSize={setNodeSize}
         ></NodeLabel>
@@ -507,11 +507,11 @@ interface NodeLabelProps {
   label: string;
   markType?: "GREEN" | "RED" | null;
   nodeType?: NodeType;
-  isShared?: boolean;
+  shared?: boolean;
   size: Size;
   setSize: React.Dispatch<React.SetStateAction<Size>>;
 }
-function NodeLabel({ label, markType, nodeType, isShared, size, setSize }: NodeLabelProps) {
+function NodeLabel({ label, markType, nodeType, shared, size, setSize }: NodeLabelProps) {
   // lines
   const textList = label.split("\n");
   const textsRef = useRef<Map<number, SVGTextElement>>(new Map());
@@ -549,7 +549,7 @@ function NodeLabel({ label, markType, nodeType, isShared, size, setSize }: NodeL
         ry="6"
       />
 
-      {nodeType === 'DETAIL' && isShared && (
+      {nodeType === 'DETAIL' && shared && (
         <foreignObject
           x={size.width / 2 - 10}
           y={size.height / -2 - 10}

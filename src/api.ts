@@ -1,4 +1,4 @@
-import type { NodeType } from "./types"
+import type { NodeData, NodeType } from "./types"
 import { clearAuthSession, getAuthSessionStatus } from './authSession'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -34,6 +34,7 @@ export interface Note {
     y: number
     parentId: number | null
     nodeType: NodeType
+    shared: boolean
     tags?: Tag[]
     createdAt: string
     updatedAt: string
@@ -88,6 +89,12 @@ export interface Tag {
     id: number
     name: string
     createdAt?: string
+}
+
+export interface SharedNoteData {
+    title: string
+    tags: Tag[]
+    detailNodes: NodeData[]
 }
 
 export interface LoginResult {
@@ -250,23 +257,57 @@ export async function permanentlyDeleteTrashBinNodes(ids: number[]): Promise<voi
     }
 }
 
-export async function toggleNoteShare(noteId: number): Promise<{ isShared: boolean } | null> {
-    try {
-        const response = await authFetch(`${API_BASE_URL}/notes/share`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ noteId }),
-        })
-        const res = await response.json()
-        if (res.code === 0) {
-            return res.data as { isShared: boolean }
-        }
-        return null
-    } catch {
-        return null
+export async function shareNote(directoryNodeId: number): Promise<string> {
+    const searchParams = new URLSearchParams({ directoryNodeId: String(directoryNodeId) })
+    const response = await authFetch(`${API_BASE_URL}/note/share?${searchParams}`, {
+        method: 'POST',
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0 || typeof res.data !== 'string') {
+        throw new Error(res.message || '分享笔记失败')
     }
+
+    return res.data
+}
+
+export async function unshareNote(directoryNodeId: number): Promise<void> {
+    const searchParams = new URLSearchParams({ directoryNodeId: String(directoryNodeId) })
+    const response = await authFetch(`${API_BASE_URL}/note/share?${searchParams}`, {
+        method: 'PATCH',
+    })
+    const res = await response.json()
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '取消分享失败')
+    }
+}
+
+export async function getSharedNote(
+    shareToken: string,
+    signal?: AbortSignal
+): Promise<SharedNoteData> {
+    const { accessToken } = getAuthSessionStatus()
+    const request = (token?: string) =>
+        fetch(`${API_BASE_URL}/note/share/${encodeURIComponent(shareToken)}`, {
+            signal,
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        })
+
+    let response = await request(accessToken ?? undefined)
+
+    // 公开分享允许匿名访问；本地 token 被服务端拒绝时，清理后按匿名请求重试。
+    if (response.status === 401 && accessToken && !signal?.aborted) {
+        clearAuthSession()
+        response = await request()
+    }
+
+    const res = (await response.json()) as ApiResponse<SharedNoteData>
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '分享笔记加载失败')
+    }
+
+    return res.data
 }
 
 export async function moveDetailNode(

@@ -9,7 +9,7 @@ export interface NodeData {
   y: number;
   markType?: MarkType;
   nodeType?: NodeType;
-  isShared?: boolean;
+  shared?: boolean;
 
   children?: NodeData[];
   expanded?: boolean;

@@ -9,6 +9,7 @@ import {
     LoaderCircle,
     RotateCcw,
     Search,
+    Share2,
     SlidersHorizontal,
     Tag as TagIcon,
     X,
@@ -431,6 +432,15 @@ export default function SearchModal({
                                         >
                                             {note.nodeType === 'DETAIL' ? '详情' : '目录'}
                                         </span>
+                                        {note.shared && (
+                                            <span
+                                                className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-300"
+                                                title="这篇笔记已分享"
+                                            >
+                                                <Share2 className="h-3 w-3" aria-hidden="true" />
+                                                已分享
+                                            </span>
+                                        )}
                                         {note.nodeType === 'DETAIL' && (
                                             <button
                                                 type="button"
