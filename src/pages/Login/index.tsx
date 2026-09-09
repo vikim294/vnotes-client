@@ -10,6 +10,7 @@ import {
   loginByEmailAndVerificationCode,
   sendLoginVerificationCode,
 } from '../../api'
+import { saveAuthSession } from '../../authSession'
 
 type LoginMethod = 'password' | 'verificationCode'
 
@@ -41,7 +42,7 @@ const Login = () => {
 
     void exchangeOAuthLoginCode(oauthLoginCode)
       .then((res) => {
-        localStorage.setItem('vnotes-token', res.data.accessToken)
+        saveAuthSession(res.data.accessToken, res.data.expiresIn)
         Toast.success('Google 登录成功')
         navigate('/', { replace: true })
       })
@@ -104,7 +105,7 @@ const Login = () => {
           ? await loginByEmailAndPassword(normalizedEmail, password)
           : await loginByEmailAndVerificationCode(normalizedEmail, verificationCode)
 
-      localStorage.setItem('vnotes-token', res.data.accessToken)
+      saveAuthSession(res.data.accessToken, res.data.expiresIn)
       Toast.success(res.message)
       navigate('/')
     } catch (error) {

@@ -1,19 +1,26 @@
 import type { NodeType } from "./types"
+import { clearAuthSession, getAuthSessionStatus } from './authSession'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 export const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL
 
 export function authFetch(url: string, init?: RequestInit): Promise<Response> {
-    const token = localStorage.getItem('vnotes-token')
+    const { accessToken, isExpired } = getAuthSessionStatus()
+
+    if (isExpired) {
+        window.location.href = '/login'
+        return Promise.reject(new Error('登录已过期'))
+    }
+
     return fetch(url, {
         ...init,
         headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
             ...init?.headers,
         },
     }).then((response) => {
         if (response.status === 401) {
-            localStorage.removeItem('vnotes-token')
+            clearAuthSession()
             window.location.href = '/login'
         }
         return response
@@ -89,9 +96,7 @@ export interface LoginResult {
     expiresIn: number
 }
 
-export interface OAuthTokenResult {
-    accessToken: string
-}
+export type OAuthTokenResult = LoginResult
 
 interface ApiResponse<T> {
     code: number

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
 import { useNavigate } from 'react-router'
+import { clearAuthSession } from '../authSession'
 import Button from '../components/Button'
 import NodeMenu, { type NodeMenuExpose } from '../components/NodeMenu'
 import NoteTree from '../components/NoteTree'
@@ -738,7 +739,7 @@ const NoteGraph = memo<NoteGraphProps>(
         }
 
         const handleLogout = () => {
-            localStorage.removeItem('vnotes-token')
+            clearAuthSession()
             navigate('/login', { replace: true })
         }
 
