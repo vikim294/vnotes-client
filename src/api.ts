@@ -328,7 +328,7 @@ export async function getSharedNote(
 ): Promise<SharedNoteData> {
     const { accessToken } = getAuthSessionStatus()
     const request = (token?: string) =>
-        fetch(`${API_BASE_URL}/note/share/${encodeURIComponent(shareToken)}`, {
+        fetch(`${API_BASE_URL}/note/shared/${encodeURIComponent(shareToken)}`, {
             signal,
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
