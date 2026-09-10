@@ -6,6 +6,7 @@ import {
     CircleUserRound,
     Copy,
     Download,
+    Eye,
     FileJson,
     Home,
     LoaderCircle,
@@ -41,6 +42,8 @@ import {
     authFetch,
     exportNotesAsJson,
     getDirectoryTags,
+    getNoteShareAccessLogs,
+    getNoteShareDetail,
     getTags,
     getUserProfile,
     importNotesFromJson,
@@ -50,6 +53,8 @@ import {
     uploadUserAvatar,
     type ImportStrategy,
     type Note,
+    type NoteShareAccessLog,
+    type NoteShareDetail,
     type Tag,
     type UserProfile,
 } from '../api'
@@ -92,6 +97,11 @@ interface NoteGraphProps {
 const VIEWPORT_STORAGE_KEY = 'vnote-directory-viewport'
 const NODE_LABEL_MAX_LENGTH = 8192
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
+
+const formatShareTime = (value: string) => {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('zh-CN')
+}
 
 const loadViewportState = () => {
     try {
@@ -260,7 +270,19 @@ const NoteGraph = memo<NoteGraphProps>(
             openModal: openShareNoteModal,
             closeModal: closeShareNoteModal,
         } = useModal()
-        const [shareLink, setShareLink] = useState('')
+        const [shareDetail, setShareDetail] = useState<NoteShareDetail | null>(null)
+        const [shareDetailNodeId, setShareDetailNodeId] = useState<number | null>(null)
+        const [isShareDetailLoading, setIsShareDetailLoading] = useState(false)
+        const [shareDetailError, setShareDetailError] = useState<string | null>(null)
+        const [isUnsharing, setIsUnsharing] = useState(false)
+        const [shareAccessLogs, setShareAccessLogs] = useState<NoteShareAccessLog[]>([])
+        const [isShareAccessLogsLoading, setIsShareAccessLogsLoading] = useState(false)
+        const [shareAccessLogsError, setShareAccessLogsError] = useState<string | null>(null)
+        const shareDetailRequestRef = useRef(0)
+        const shareAccessLogsRequestRef = useRef(0)
+        const shareLink = shareDetail
+            ? `${SHARE_NOTE_BASE_URL}/${encodeURIComponent(shareDetail.shareToken)}`
+            : ''
 
         // exit confirmation modal
         const {
@@ -666,6 +688,55 @@ const NoteGraph = memo<NoteGraphProps>(
             closeNodeMarkModal()
         }
 
+        const loadShareAccessLogs = async (noteShareId: number) => {
+            const requestId = ++shareAccessLogsRequestRef.current
+            setShareAccessLogs([])
+            setShareAccessLogsError(null)
+            setIsShareAccessLogsLoading(true)
+
+            try {
+                const accessLogs = await getNoteShareAccessLogs(noteShareId)
+                if (requestId !== shareAccessLogsRequestRef.current) return
+                setShareAccessLogs(accessLogs)
+            } catch (error) {
+                if (requestId !== shareAccessLogsRequestRef.current) return
+                setShareAccessLogsError(
+                    error instanceof Error ? error.message : '访问记录加载失败'
+                )
+            } finally {
+                if (requestId === shareAccessLogsRequestRef.current) {
+                    setIsShareAccessLogsLoading(false)
+                }
+            }
+        }
+
+        const loadShareDetail = async (nodeId: number) => {
+            const requestId = ++shareDetailRequestRef.current
+            shareAccessLogsRequestRef.current += 1
+            setShareDetailNodeId(nodeId)
+            setShareDetail(null)
+            setShareDetailError(null)
+            setIsShareDetailLoading(true)
+            setShareAccessLogs([])
+            setShareAccessLogsError(null)
+            setIsShareAccessLogsLoading(false)
+            openShareNoteModal()
+
+            try {
+                const detail = await getNoteShareDetail(nodeId)
+                if (requestId !== shareDetailRequestRef.current) return
+                setShareDetail(detail)
+                setIsShareDetailLoading(false)
+                void loadShareAccessLogs(detail.id)
+            } catch (error) {
+                if (requestId !== shareDetailRequestRef.current) return
+                setShareDetailError(
+                    error instanceof Error ? error.message : '分享详情加载失败'
+                )
+                setIsShareDetailLoading(false)
+            }
+        }
+
         const handleNodeToggleShare = async () => {
             const nodeId = selectedNode?.id
             if (
@@ -680,19 +751,13 @@ const NoteGraph = memo<NoteGraphProps>(
             const wasShared = selectedNode.shared === true
             handleNodeMenuClose()
 
-            try {
-                if (wasShared) {
-                    await unshareNote(nodeId)
-                    setFlatTree((prev) =>
-                        prev.map((node) =>
-                            node.id === nodeId ? { ...node, shared: false } : node
-                        )
-                    )
-                    Toast.success('已取消分享')
-                    return
-                }
+            if (wasShared) {
+                void loadShareDetail(nodeId)
+                return
+            }
 
-                const shareToken = await shareNote(nodeId)
+            try {
+                await shareNote(nodeId)
                 setFlatTree((prev) => {
                     return prev.map((node) => {
                         if (node.id === nodeId) {
@@ -704,11 +769,24 @@ const NoteGraph = memo<NoteGraphProps>(
                         return node
                     })
                 })
-                setShareLink(`${SHARE_NOTE_BASE_URL}/${encodeURIComponent(shareToken)}`)
-                openShareNoteModal()
+                Toast.success('分享成功')
+                void loadShareDetail(nodeId)
             } catch (error) {
                 Toast.error(error instanceof Error ? error.message : '分享状态更新失败')
             }
+        }
+
+        const handleCloseShareDetail = () => {
+            shareDetailRequestRef.current += 1
+            shareAccessLogsRequestRef.current += 1
+            closeShareNoteModal()
+            setShareDetail(null)
+            setShareDetailNodeId(null)
+            setShareDetailError(null)
+            setShareAccessLogs([])
+            setShareAccessLogsError(null)
+            setIsShareDetailLoading(false)
+            setIsShareAccessLogsLoading(false)
         }
 
         const handleCopyShareLink = async () => {
@@ -719,6 +797,26 @@ const NoteGraph = memo<NoteGraphProps>(
                 Toast.success('分享链接已复制')
             } catch {
                 Toast.error('复制失败，请手动复制链接')
+            }
+        }
+
+        const handleUnshareFromDetail = async () => {
+            if (shareDetailNodeId === null || isUnsharing) return
+
+            setIsUnsharing(true)
+            try {
+                await unshareNote(shareDetailNodeId)
+                setFlatTree((prev) =>
+                    prev.map((node) =>
+                        node.id === shareDetailNodeId ? { ...node, shared: false } : node
+                    )
+                )
+                handleCloseShareDetail()
+                Toast.success('已取消分享')
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '取消分享失败')
+            } finally {
+                setIsUnsharing(false)
             }
         }
 
@@ -1866,31 +1964,155 @@ const NoteGraph = memo<NoteGraphProps>(
 
                         <ShareNoteModal
                             width={620}
-                            header="分享笔记"
-                            closeOnClickMask
-                            footer={<Button onClick={closeShareNoteModal}>关闭</Button>}
+                            header="分享详情"
+                            footer={
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <Button
+                                        type="primary"
+                                        className="gap-2"
+                                        disabled={!shareDetail || isUnsharing}
+                                        onClick={() => void handleCopyShareLink()}
+                                    >
+                                        <Copy className="h-4 w-4" aria-hidden="true" />
+                                        复制链接
+                                    </Button>
+                                    <Button
+                                        type="danger"
+                                        disabled={
+                                            !shareDetail ||
+                                            shareDetail.status !== 'ACTIVE' ||
+                                            isUnsharing
+                                        }
+                                        onClick={() => void handleUnshareFromDetail()}
+                                    >
+                                        {isUnsharing ? '正在取消...' : '取消分享'}
+                                    </Button>
+                                    <Button
+                                        onClick={handleCloseShareDetail}
+                                        disabled={isUnsharing}
+                                    >
+                                        关闭
+                                    </Button>
+                                </div>
+                            }
                         >
-                            <p className="mb-3 text-sm text-slate-400">
-                                任何获得此链接的人都可以访问这篇笔记
-                            </p>
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                                <input
-                                    type="text"
-                                    readOnly
-                                    value={shareLink}
-                                    aria-label="分享链接"
-                                    className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                                    onFocus={(event) => event.currentTarget.select()}
-                                />
-                                <Button
-                                    type="primary"
-                                    className="gap-2"
-                                    onClick={() => void handleCopyShareLink()}
-                                >
-                                    <Copy className="h-4 w-4" aria-hidden="true" />
-                                    复制链接
-                                </Button>
-                            </div>
+                            {isShareDetailLoading ? (
+                                <div className="flex min-h-40 flex-col items-center justify-center gap-3 text-sm text-slate-400">
+                                    <LoaderCircle className="h-6 w-6 animate-spin text-indigo-400" />
+                                    正在加载分享详情
+                                </div>
+                            ) : shareDetailError ? (
+                                <div className="flex min-h-40 flex-col items-center justify-center gap-4 text-center">
+                                    <p className="text-sm text-rose-400">{shareDetailError}</p>
+                                    {shareDetailNodeId !== null && (
+                                        <Button
+                                            onClick={() =>
+                                                void loadShareDetail(shareDetailNodeId)
+                                            }
+                                        >
+                                            重新加载
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : shareDetail ? (
+                                <div className="space-y-5">
+                                    <dl className="grid gap-4 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-start">
+                                        <dt className="text-sm text-slate-400">Share Token</dt>
+                                        <dd className="break-all font-mono text-sm text-slate-200">
+                                            {shareDetail.shareToken}
+                                        </dd>
+                                        <dt className="text-sm text-slate-400">分享时间</dt>
+                                        <dd className="text-sm text-slate-200">
+                                            {formatShareTime(shareDetail.updatedAt)}
+                                        </dd>
+                                    </dl>
+                                    <div>
+                                        <label
+                                            htmlFor="share-note-link"
+                                            className="mb-2 block text-sm text-slate-400"
+                                        >
+                                            分享链接
+                                        </label>
+                                        <input
+                                            id="share-note-link"
+                                            type="text"
+                                            readOnly
+                                            value={shareLink}
+                                            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                                            onFocus={(event) => event.currentTarget.select()}
+                                        />
+                                    </div>
+                                    <section aria-labelledby="share-access-logs-title">
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                            <h4
+                                                id="share-access-logs-title"
+                                                className="text-sm font-medium text-slate-200"
+                                            >
+                                                访问记录
+                                            </h4>
+                                            {!isShareAccessLogsLoading && !shareAccessLogsError && (
+                                                <span className="text-xs text-slate-500">
+                                                    共 {shareAccessLogs.length} 条
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950/70">
+                                            {isShareAccessLogsLoading ? (
+                                                <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-500">
+                                                    <LoaderCircle className="h-4 w-4 animate-spin text-indigo-400" />
+                                                    正在加载访问记录
+                                                </div>
+                                            ) : shareAccessLogsError ? (
+                                                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                                                    <p className="text-sm text-rose-400">
+                                                        {shareAccessLogsError}
+                                                    </p>
+                                                    <Button
+                                                        onClick={() =>
+                                                            void loadShareAccessLogs(shareDetail.id)
+                                                        }
+                                                    >
+                                                        重新加载
+                                                    </Button>
+                                                </div>
+                                            ) : shareAccessLogs.length === 0 ? (
+                                                <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                                                    暂无访问记录
+                                                </div>
+                                            ) : (
+                                                <ul className="divide-y divide-slate-800">
+                                                    {shareAccessLogs.map((accessLog) => (
+                                                        <li
+                                                            key={accessLog.id}
+                                                            className="flex items-center gap-3 px-4 py-3"
+                                                        >
+                                                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-500/10 text-indigo-300">
+                                                                <Eye
+                                                                    className="h-4 w-4"
+                                                                    aria-hidden="true"
+                                                                />
+                                                            </span>
+                                                            <span className="text-sm text-slate-300">
+                                                                访问分享笔记
+                                                            </span>
+                                                            <time
+                                                                dateTime={accessLog.createdAt}
+                                                                className="ml-auto text-xs text-slate-500"
+                                                            >
+                                                                {formatShareTime(
+                                                                    accessLog.createdAt
+                                                                )}
+                                                            </time>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    </section>
+                                </div>
+                            ) : (
+                                <div className="min-h-40" />
+                            )}
                         </ShareNoteModal>
 
                         <NodeMarkModal

@@ -209,7 +209,7 @@ export default function NodeMenu({
                     <Button className="block w-full" onClick={onToggleShare}>
                         <div className="flex items-center gap-2">
                             <Share2 className="h-4 w-4" />
-                            {selectedNode?.shared ? 'unshare' : 'share'}
+                            {selectedNode?.shared ? 'share detail' : 'share'}
                         </div>
                     </Button>
                 )}

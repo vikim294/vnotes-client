@@ -97,6 +97,20 @@ export interface SharedNoteData {
     detailNodes: NodeData[]
 }
 
+export interface NoteShareDetail {
+    id: number
+    directoryNodeId: number
+    shareToken: string
+    status: 'ACTIVE' | 'REVOKED'
+    createdAt: string
+    updatedAt: string
+}
+
+export interface NoteShareAccessLog {
+    id: number
+    createdAt: string
+}
+
 export interface LoginResult {
     accessToken: string
     tokenType: string
@@ -281,6 +295,31 @@ export async function unshareNote(directoryNodeId: number): Promise<void> {
     if (!response.ok || res.code !== 0) {
         throw new Error(res.message || '取消分享失败')
     }
+}
+
+export async function getNoteShareDetail(directoryNodeId: number): Promise<NoteShareDetail> {
+    const searchParams = new URLSearchParams({ directoryNodeId: String(directoryNodeId) })
+    const response = await authFetch(`${API_BASE_URL}/note/share?${searchParams}`)
+    const res = (await response.json()) as ApiResponse<NoteShareDetail>
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '分享详情加载失败')
+    }
+
+    return res.data
+}
+
+export async function getNoteShareAccessLogs(
+    noteShareId: number
+): Promise<NoteShareAccessLog[]> {
+    const response = await authFetch(`${API_BASE_URL}/note/share/access-logs/${noteShareId}`)
+    const res = (await response.json()) as ApiResponse<NoteShareAccessLog[]>
+
+    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+        throw new Error(res.message || '访问记录加载失败')
+    }
+
+    return res.data
 }
 
 export async function getSharedNote(
