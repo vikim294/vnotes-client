@@ -739,7 +739,14 @@ const NoteGraph = memo<NoteGraphProps>(
 
         const handleNodeSetParent = () => {
             setNodeMenuVisible(false)
+            setChosenParentNodeId(null)
             setIsChoosingParent(true)
+        }
+
+        const handleCancelChooseParent = () => {
+            setIsChoosingParent(false)
+            setChosenParentNodeId(null)
+            setNodeMenuVisible(false)
         }
 
         const handleNodeDisconnectFromParent = () => {
@@ -1796,19 +1803,14 @@ const NoteGraph = memo<NoteGraphProps>(
 
                     {/* choosing a parent node */}
                     {isChoosingParent && chosenParentNodeId === null && (
-                        <div className="fixed top-10 left-1/2 -translate-x-1/2 text-white">
-                            please choose a parent node
+                        <div className="fixed top-10 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-lg backdrop-blur-sm">
+                            <span>please choose a parent node</span>
+                            <Button onClick={handleCancelChooseParent}>cancel</Button>
                         </div>
                     )}
                     {chosenParentNodeId !== null && (
                         <div className="fixed top-10 left-1/2 flex -translate-x-1/2 gap-2">
-                            <Button
-                                onClick={() => {
-                                    setIsChoosingParent(false)
-                                    setChosenParentNodeId(null)
-                                    setNodeMenuVisible(true)
-                                }}
-                            >
+                            <Button onClick={handleCancelChooseParent}>
                                 cancel
                             </Button>
                             <Button
