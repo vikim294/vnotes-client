@@ -96,9 +96,80 @@ interface NoteGraphProps {
 
 const VIEWPORT_STORAGE_KEY = 'vnote-directory-viewport'
 const NODE_LABEL_MAX_LENGTH = 8192
+const NODE_INDENT = '    '
 const NODE_TEXTAREA_CLASS_NAME =
     'bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] p-2 outline-none'
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
+
+interface TextareaIndentEdit {
+    value: string
+    selectionStart: number
+    selectionEnd: number
+}
+
+const editTextareaIndentation = (
+    value: string,
+    selectionStart: number,
+    selectionEnd: number,
+    outdent: boolean
+): TextareaIndentEdit => {
+    if (!outdent && selectionStart === selectionEnd) {
+        return {
+            value: `${value.slice(0, selectionStart)}${NODE_INDENT}${value.slice(selectionEnd)}`,
+            selectionStart: selectionStart + NODE_INDENT.length,
+            selectionEnd: selectionStart + NODE_INDENT.length,
+        }
+    }
+
+    const blockStart = value.lastIndexOf('\n', Math.max(0, selectionStart - 1)) + 1
+    const effectiveEnd =
+        selectionEnd > selectionStart && value[selectionEnd - 1] === '\n'
+            ? selectionEnd - 1
+            : selectionEnd
+    const nextLineBreak = value.indexOf('\n', effectiveEnd)
+    const blockEnd = nextLineBreak === -1 ? value.length : nextLineBreak
+    const block = value.slice(blockStart, blockEnd)
+    const lines = block.split('\n')
+
+    if (!outdent) {
+        const indentedBlock = lines.map((line) => `${NODE_INDENT}${line}`).join('\n')
+        return {
+            value: `${value.slice(0, blockStart)}${indentedBlock}${value.slice(blockEnd)}`,
+            selectionStart: selectionStart + NODE_INDENT.length,
+            selectionEnd: selectionEnd + NODE_INDENT.length * lines.length,
+        }
+    }
+
+    const removals = lines.map((line) => {
+        if (line.startsWith('\t')) return 1
+        return Math.min(line.match(/^ */)?.[0].length ?? 0, NODE_INDENT.length)
+    })
+    const outdentedBlock = lines
+        .map((line, index) => line.slice(removals[index]))
+        .join('\n')
+
+    const removedBefore = (position: number) => {
+        let lineOffset = 0
+        let removed = 0
+
+        lines.forEach((line, index) => {
+            const lineStart = blockStart + lineOffset
+            removed += Math.min(
+                removals[index],
+                Math.max(0, position - lineStart)
+            )
+            lineOffset += line.length + 1
+        })
+
+        return removed
+    }
+
+    return {
+        value: `${value.slice(0, blockStart)}${outdentedBlock}${value.slice(blockEnd)}`,
+        selectionStart: selectionStart - removedBefore(selectionStart),
+        selectionEnd: selectionEnd - removedBefore(selectionEnd),
+    }
+}
 
 const formatShareTime = (value: string) => {
     const date = new Date(value)
@@ -372,6 +443,32 @@ const NoteGraph = memo<NoteGraphProps>(
             setIsTagSelectionLoading(false)
             setTagSelectionError(null)
             setIsTagSelectionReady(false)
+        }
+
+        const handleNodeTextareaKeyDown = (
+            event: React.KeyboardEvent<HTMLTextAreaElement>
+        ) => {
+            if (event.key !== 'Tab') return
+
+            event.preventDefault()
+            const textarea = event.currentTarget
+            const edit = editTextareaIndentation(
+                textarea.value,
+                textarea.selectionStart,
+                textarea.selectionEnd,
+                event.shiftKey
+            )
+
+            if (edit.value.length > NODE_LABEL_MAX_LENGTH || edit.value === textarea.value) {
+                return
+            }
+
+            setNodeEditContent(edit.value)
+            window.requestAnimationFrame(() => {
+                if (textarea.isConnected) {
+                    textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd)
+                }
+            })
         }
 
         const loadTagSelection = async (
@@ -2253,6 +2350,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                         maxLength={NODE_LABEL_MAX_LENGTH}
                                         value={nodeEditContent}
                                         onChange={(e) => setNodeEditContent(e.target.value)}
+                                        onKeyDown={handleNodeTextareaKeyDown}
                                     />
                                 ) : (
                                     <>
@@ -2304,6 +2402,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     maxLength={NODE_LABEL_MAX_LENGTH}
                                     value={nodeEditContent}
                                     onChange={(e) => setNodeEditContent(e.target.value)}
+                                    onKeyDown={handleNodeTextareaKeyDown}
                                 />
                             )}
 
@@ -2388,6 +2487,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                         maxLength={NODE_LABEL_MAX_LENGTH}
                                         value={nodeEditContent}
                                         onChange={(e) => setNodeEditContent(e.target.value)}
+                                        onKeyDown={handleNodeTextareaKeyDown}
                                     />
                                 ) : (
                                     <>
