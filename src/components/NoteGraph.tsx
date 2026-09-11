@@ -96,6 +96,8 @@ interface NoteGraphProps {
 
 const VIEWPORT_STORAGE_KEY = 'vnote-directory-viewport'
 const NODE_LABEL_MAX_LENGTH = 8192
+const NODE_TEXTAREA_CLASS_NAME =
+    'bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] p-2 outline-none'
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
 
 const formatShareTime = (value: string) => {
@@ -2245,7 +2247,8 @@ const NoteGraph = memo<NoteGraphProps>(
                                 {nodeContentType === 'TEXT' ? (
                                     <textarea
                                         ref={newNodeAddModalInputRef}
-                                        className="bg-textarea w-full resize-none p-2 outline-none"
+                                        className={NODE_TEXTAREA_CLASS_NAME}
+                                        wrap="off"
                                         rows={6}
                                         maxLength={NODE_LABEL_MAX_LENGTH}
                                         value={nodeEditContent}
@@ -2295,7 +2298,8 @@ const NoteGraph = memo<NoteGraphProps>(
                             {selectedNode?.contentType !== 'IMAGE' && (
                                 <textarea
                                     ref={nodeEditModalInputRef}
-                                    className="bg-textarea w-full resize-none p-2 outline-none"
+                                    className={NODE_TEXTAREA_CLASS_NAME}
+                                    wrap="off"
                                     rows={6}
                                     maxLength={NODE_LABEL_MAX_LENGTH}
                                     value={nodeEditContent}
@@ -2378,7 +2382,8 @@ const NoteGraph = memo<NoteGraphProps>(
                                 {nodeContentType === 'TEXT' ? (
                                     <textarea
                                         ref={nodeAddModalInputRef}
-                                        className="bg-textarea w-full resize-none p-2 outline-none"
+                                        className={NODE_TEXTAREA_CLASS_NAME}
+                                        wrap="off"
                                         rows={6}
                                         maxLength={NODE_LABEL_MAX_LENGTH}
                                         value={nodeEditContent}
