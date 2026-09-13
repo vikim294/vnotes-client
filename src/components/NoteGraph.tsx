@@ -2276,7 +2276,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950/70">
+                                        <div className="h-48 overflow-auto rounded-lg border border-slate-700 bg-slate-950/70">
                                             {isShareAccessLogsLoading ? (
                                                 <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-500">
                                                     <LoaderCircle className="h-4 w-4 animate-spin text-indigo-400" />
@@ -2300,19 +2300,19 @@ const NoteGraph = memo<NoteGraphProps>(
                                                     暂无访问记录
                                                 </div>
                                             ) : (
-                                                <table className="w-full table-fixed text-left text-sm">
+                                                <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
                                                     <thead className="sticky top-0 z-10 bg-slate-900 text-xs text-slate-400">
                                                         <tr>
-                                                            <th className="w-28 px-4 py-2 font-medium">
+                                                            <th className="w-28 whitespace-nowrap px-4 py-2 font-medium">
                                                                 访问类型
                                                             </th>
-                                                            <th className="px-4 py-2 font-medium">
+                                                            <th className="w-40 whitespace-nowrap px-4 py-2 font-medium">
                                                                 目标节点
                                                             </th>
-                                                            <th className="w-28 px-4 py-2 font-medium">
+                                                            <th className="w-28 whitespace-nowrap px-4 py-2 font-medium">
                                                                 访客
                                                             </th>
-                                                            <th className="w-36 px-4 py-2 font-medium">
+                                                            <th className="w-36 whitespace-nowrap px-4 py-2 font-medium">
                                                                 访问时间
                                                             </th>
                                                         </tr>
@@ -2320,7 +2320,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                                     <tbody className="divide-y divide-slate-800">
                                                         {shareAccessLogs.map((accessLog) => (
                                                             <tr key={accessLog.id}>
-                                                                <td className="px-4 py-3 align-middle">
+                                                                <td className="whitespace-nowrap px-4 py-3 align-middle">
                                                                     <span className="inline-flex items-center gap-2 text-slate-300">
                                                                         <Eye
                                                                             className="h-4 w-4 shrink-0 text-indigo-300"
@@ -2345,7 +2345,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                                                     {accessLog.targetLabel ??
                                                                         '节点已被删除'}
                                                                 </td>
-                                                                <td className="px-4 py-3 align-middle">
+                                                                <td className="whitespace-nowrap px-4 py-3 align-middle">
                                                                     <span
                                                                         className="inline-block rounded bg-slate-800 px-2 py-1 font-mono text-xs text-slate-400"
                                                                         title={
@@ -2361,7 +2361,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                                                             : '未知'}
                                                                     </span>
                                                                 </td>
-                                                                <td className="px-4 py-3 align-middle">
+                                                                <td className="whitespace-nowrap px-4 py-3 align-middle">
                                                                     <time
                                                                         dateTime={accessLog.createdAt}
                                                                         className="text-xs text-slate-500"
