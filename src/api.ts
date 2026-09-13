@@ -110,6 +110,7 @@ export interface NoteShareAccessLog {
     id: number
     target: 'NOTE' | 'ARTICLE'
     targetLabel: string | null
+    visitorId: string | null
     createdAt: string
 }
 
@@ -339,6 +340,7 @@ export async function getSharedNote(
     const request = (token?: string) =>
         fetch(`${API_BASE_URL}/note/shared/note/${encodeURIComponent(shareToken)}`, {
             signal,
+            credentials: 'include',
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
 
@@ -368,6 +370,7 @@ export async function getSharedArticle(
     const request = (token?: string) =>
         fetch(url, {
             signal,
+            credentials: 'include',
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
 

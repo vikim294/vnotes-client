@@ -2309,7 +2309,10 @@ const NoteGraph = memo<NoteGraphProps>(
                                                             <th className="px-4 py-2 font-medium">
                                                                 目标节点
                                                             </th>
-                                                            <th className="w-40 px-4 py-2 font-medium">
+                                                            <th className="w-28 px-4 py-2 font-medium">
+                                                                访客
+                                                            </th>
+                                                            <th className="w-36 px-4 py-2 font-medium">
                                                                 访问时间
                                                             </th>
                                                         </tr>
@@ -2341,6 +2344,22 @@ const NoteGraph = memo<NoteGraphProps>(
                                                                 >
                                                                     {accessLog.targetLabel ??
                                                                         '节点已被删除'}
+                                                                </td>
+                                                                <td className="px-4 py-3 align-middle">
+                                                                    <span
+                                                                        className="inline-block rounded bg-slate-800 px-2 py-1 font-mono text-xs text-slate-400"
+                                                                        title={
+                                                                            accessLog.visitorId ??
+                                                                            '未知访客'
+                                                                        }
+                                                                    >
+                                                                        {accessLog.visitorId
+                                                                            ? accessLog.visitorId.slice(
+                                                                                  0,
+                                                                                  8
+                                                                              )
+                                                                            : '未知'}
+                                                                    </span>
                                                                 </td>
                                                                 <td className="px-4 py-3 align-middle">
                                                                     <time
