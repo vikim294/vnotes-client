@@ -111,6 +111,13 @@ export interface NoteShareAccessLog {
     createdAt: string
 }
 
+export interface Article {
+    id: number
+    content: string | null
+    createdAt: string
+    updatedAt: string
+}
+
 export interface LoginResult {
     accessToken: string
     tokenType: string
@@ -366,6 +373,30 @@ export async function moveDetailNode(
 
     if (!response.ok || res.code !== 0) {
         throw new Error(res.message || '详情节点移动失败')
+    }
+}
+
+export async function getArticle(detailNodeId: number): Promise<Article> {
+    const response = await authFetch(`${API_BASE_URL}/note/article/${detailNodeId}`)
+    const res = (await response.json()) as ApiResponse<Article>
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '文章加载失败')
+    }
+
+    return res.data
+}
+
+export async function updateArticle(detailNodeId: number, content: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/note/article/${detailNodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+    })
+    const res = (await response.json()) as ApiResponse<void>
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '文章更新失败')
     }
 }
 

@@ -15,6 +15,7 @@ export interface NodeData {
   expanded?: boolean;
   opStatus?: OpStatus;
   contentType?: NodeContentType;
+  article?: boolean;
   isTempImageUrl?: boolean;
   imageUrl?: string;
   imageWidth?: number;
@@ -43,6 +44,7 @@ export interface AddedNodeDto extends NodeMutationFields {
   parentUuid?: string | null;
   nodeType?: NodeType;
   contentType?: NodeContentType;
+  article?: boolean;
   tagIds?: number[];
 }
 

@@ -15,6 +15,7 @@ const PaperContext = createContext<{
   setNodeMenuVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setSelectedNodeId: React.Dispatch<React.SetStateAction<number | string | null>>;
   setChosenParentNodeId: React.Dispatch<React.SetStateAction<number | string | null>>;
+  openArticle: (detailNodeId: number, mode: "view" | "edit") => void;
 } | null>(null);
 
 export default PaperContext;

@@ -8,6 +8,7 @@ import {
     Download,
     Eye,
     FileJson,
+    FileText,
     Home,
     LoaderCircle,
     LogOut,
@@ -41,6 +42,7 @@ import {
     API_BASE_URL,
     authFetch,
     exportNotesAsJson,
+    getArticle,
     getDirectoryTags,
     getNoteShareAccessLogs,
     getNoteShareDetail,
@@ -50,7 +52,9 @@ import {
     moveDetailNode,
     shareNote,
     unshareNote,
+    updateArticle,
     uploadUserAvatar,
+    type Article,
     type ImportStrategy,
     type Note,
     type NoteShareAccessLog,
@@ -281,6 +285,7 @@ const NoteGraph = memo<NoteGraphProps>(
         const newNodeAddModalInputRef = useRef<HTMLTextAreaElement>(null)
         // for choosing new node content type: text or image
         const [nodeContentType, setNodeContentType] = useState<NodeContentType>('TEXT')
+        const [isArticleNode, setIsArticleNode] = useState(false)
         // for previewing the selected image file before uploading
         const [tempFileUrl, setTempFileUrl] = useState<string | null>(null)
         const [tempImageSize, setTempImageSize] = useState<{
@@ -307,6 +312,21 @@ const NoteGraph = memo<NoteGraphProps>(
         })
         const [nodeEditContent, setNodeEditContent] = useState('')
         const nodeEditModalInputRef = useRef<HTMLTextAreaElement>(null)
+
+        // article content belongs to a persisted detail node and is saved independently.
+        const {
+            Modal: ArticleModal,
+            openModal: openArticleModal,
+            closeModal: closeArticleModal,
+        } = useModal()
+        const [articleDetailNodeId, setArticleDetailNodeId] = useState<number | null>(null)
+        const [articleModalMode, setArticleModalMode] = useState<'view' | 'edit'>('view')
+        const [article, setArticle] = useState<Article | null>(null)
+        const [articleContent, setArticleContent] = useState('')
+        const [isArticleLoading, setIsArticleLoading] = useState(false)
+        const [isArticleSaving, setIsArticleSaving] = useState(false)
+        const [articleError, setArticleError] = useState<string | null>(null)
+        const articleRequestRef = useRef(0)
 
         // add node
         const {
@@ -407,6 +427,39 @@ const NoteGraph = memo<NoteGraphProps>(
             label: string
         } | null>(null)
 
+        const loadArticle = useCallback(async (detailNodeId: number) => {
+            const requestId = ++articleRequestRef.current
+            setArticle(null)
+            setArticleContent('')
+            setArticleError(null)
+            setIsArticleLoading(true)
+
+            try {
+                const nextArticle = await getArticle(detailNodeId)
+                if (requestId !== articleRequestRef.current) return
+                setArticle(nextArticle)
+                setArticleContent(nextArticle.content ?? '')
+            } catch (error) {
+                if (requestId !== articleRequestRef.current) return
+                setArticleError(error instanceof Error ? error.message : '文章加载失败')
+            } finally {
+                if (requestId === articleRequestRef.current) {
+                    setIsArticleLoading(false)
+                }
+            }
+        }, [])
+
+        const openArticle = useCallback(
+            (detailNodeId: number, mode: 'view' | 'edit') => {
+                setNodeMenuVisible(false)
+                setArticleDetailNodeId(detailNodeId)
+                setArticleModalMode(mode)
+                openArticleModal()
+                void loadArticle(detailNodeId)
+            },
+            [loadArticle, openArticleModal]
+        )
+
         // context
         const paperContext = useMemo(
             () => ({
@@ -422,6 +475,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 setFlatTree,
                 setNodeMenuVisible,
                 setChosenParentNodeId,
+                openArticle,
             }),
             [
                 graphType,
@@ -432,6 +486,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 viewport.zoom,
                 selectedNodeId,
                 isChoosingParent,
+                openArticle,
             ]
         )
 
@@ -530,6 +585,7 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeType('DIRECTORY')
             resetTagSelection()
             setNodeContentType('TEXT')
+            setIsArticleNode(false)
             setTempFileUrl(null)
             setTempImageSize(null)
             tempFileRef.current = null
@@ -731,6 +787,7 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeType('DIRECTORY')
             resetTagSelection()
             setNodeContentType('TEXT')
+            setIsArticleNode(false)
             setTempFileUrl(null)
             setTempImageSize(null)
             tempFileRef.current = null
@@ -773,6 +830,52 @@ const NoteGraph = memo<NoteGraphProps>(
             setMarkValue(selectedNode?.markType ?? null)
             setNodeMenuVisible(false)
             openNodeMarkModal()
+        }
+
+        const handleNodeOpenArticle = () => {
+            const detailNodeId = selectedNode?.id
+            if (
+                graphType !== 'detail' ||
+                selectedNode?.article !== true ||
+                typeof detailNodeId !== 'number'
+            ) {
+                return
+            }
+
+            openArticle(detailNodeId, 'edit')
+        }
+
+        const handleCloseArticle = () => {
+            articleRequestRef.current += 1
+            closeArticleModal()
+            setArticleDetailNodeId(null)
+            setArticleModalMode('view')
+            setArticle(null)
+            setArticleContent('')
+            setArticleError(null)
+            setIsArticleLoading(false)
+        }
+
+        const handleSaveArticle = async () => {
+            if (
+                articleModalMode !== 'edit' ||
+                articleDetailNodeId === null ||
+                !article ||
+                isArticleSaving
+            ) {
+                return
+            }
+
+            setIsArticleSaving(true)
+            try {
+                await updateArticle(articleDetailNodeId, articleContent)
+                handleCloseArticle()
+                Toast.success('文章已保存')
+            } catch (error) {
+                Toast.error(error instanceof Error ? error.message : '文章保存失败')
+            } finally {
+                setIsArticleSaving(false)
+            }
         }
 
         const handleNodeMarkConfirm = () => {
@@ -1095,6 +1198,10 @@ const NoteGraph = memo<NoteGraphProps>(
                 parentUuid: null,
                 opStatus: 'new',
                 markType: graphType === 'detail' ? null : undefined,
+                article:
+                    graphType === 'detail' && nodeContentType === 'TEXT'
+                        ? isArticleNode
+                        : undefined,
                 // directory graph only
                 nodeType,
                 tagIds:
@@ -1188,6 +1295,10 @@ const NoteGraph = memo<NoteGraphProps>(
                     y: pNode.y + 100,
                     opStatus: 'new',
                     markType: graphType === 'detail' ? null : undefined,
+                    article:
+                        graphType === 'detail' && nodeContentType === 'TEXT'
+                            ? isArticleNode
+                            : undefined,
                     // directory graph only
                     nodeType,
                     tagIds:
@@ -1214,6 +1325,10 @@ const NoteGraph = memo<NoteGraphProps>(
                     y: pNode.y + 100,
                     opStatus: 'new',
                     markType: graphType === 'detail' ? null : undefined,
+                    article:
+                        graphType === 'detail' && nodeContentType === 'TEXT'
+                            ? isArticleNode
+                            : undefined,
                     // directory graph only
                     nodeType,
                     tagIds:
@@ -1796,6 +1911,7 @@ const NoteGraph = memo<NoteGraphProps>(
                             onOpenMark={handleNodeOpenMark}
                             onToggleShare={handleNodeToggleShare}
                             onMoveTo={handleNodeMoveTo}
+                            onOpenArticle={handleNodeOpenArticle}
                             onDelete={handleNodeDelete}
                             onClose={handleNodeMenuClose}
                         />
@@ -2291,6 +2407,72 @@ const NoteGraph = memo<NoteGraphProps>(
                             </fieldset>
                         </NodeMarkModal>
 
+                        <ArticleModal
+                            width={900}
+                            header={articleModalMode === 'edit' ? '编辑文章' : '查看文章'}
+                            closeOnClickMask={!isArticleSaving}
+                            footer={
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        onClick={handleCloseArticle}
+                                        disabled={isArticleSaving}
+                                    >
+                                        关闭
+                                    </Button>
+                                    {articleModalMode === 'edit' && (
+                                        <Button
+                                            type="primary"
+                                            onClick={() => void handleSaveArticle()}
+                                            disabled={!article || isArticleLoading || isArticleSaving}
+                                        >
+                                            {isArticleSaving ? '正在保存...' : '保存文章'}
+                                        </Button>
+                                    )}
+                                </div>
+                            }
+                        >
+                            {isArticleLoading ? (
+                                <div className="flex min-h-80 flex-col items-center justify-center gap-3 text-sm text-slate-400">
+                                    <LoaderCircle className="h-6 w-6 animate-spin text-cyan-400" />
+                                    正在加载文章
+                                </div>
+                            ) : articleError ? (
+                                <div className="flex min-h-80 flex-col items-center justify-center gap-4 text-center">
+                                    <p className="text-sm text-rose-400">{articleError}</p>
+                                    {articleDetailNodeId !== null && (
+                                        <Button
+                                            onClick={() => void loadArticle(articleDetailNodeId)}
+                                        >
+                                            重新加载
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : article && articleModalMode === 'edit' ? (
+                                <label className="block">
+                                    <span className="mb-2 flex items-center gap-2 text-sm text-slate-400">
+                                        <FileText className="h-4 w-4 text-cyan-400" />
+                                        正文
+                                    </span>
+                                    <textarea
+                                        className="bg-textarea min-h-96 w-full resize-y rounded-lg border border-slate-700 p-4 leading-7 text-slate-100 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                        value={articleContent}
+                                        onChange={(event) => setArticleContent(event.target.value)}
+                                        disabled={isArticleSaving}
+                                        placeholder="开始编写文章内容..."
+                                        spellCheck={false}
+                                    />
+                                </label>
+                            ) : article ? (
+                                <article className="min-h-96 whitespace-pre-wrap break-words rounded-lg border border-slate-700 bg-slate-950/60 p-5 leading-7 text-slate-200">
+                                    {article.content || (
+                                        <span className="text-slate-500">暂无文章内容</span>
+                                    )}
+                                </article>
+                            ) : (
+                                <div className="min-h-80" />
+                            )}
+                        </ArticleModal>
+
                         <NewNodeAddModal
                             width={800}
                             header="添加新结点"
@@ -2337,8 +2519,23 @@ const NoteGraph = memo<NoteGraphProps>(
                                             type="radio"
                                             name="opStatus"
                                             checked={nodeContentType === 'IMAGE'}
-                                            onChange={() => setNodeContentType('IMAGE')}
+                                            onChange={() => {
+                                                setNodeContentType('IMAGE')
+                                                setIsArticleNode(false)
+                                            }}
                                         />
+                                    </label>
+                                )}
+                                {graphType === 'detail' && nodeContentType === 'TEXT' && (
+                                    <label className="ml-4 inline-flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={isArticleNode}
+                                            onChange={(event) =>
+                                                setIsArticleNode(event.target.checked)
+                                            }
+                                        />
+                                        is article
                                     </label>
                                 )}
                             </div>
@@ -2474,8 +2671,23 @@ const NoteGraph = memo<NoteGraphProps>(
                                             type="radio"
                                             name="opStatus"
                                             checked={nodeContentType === 'IMAGE'}
-                                            onChange={() => setNodeContentType('IMAGE')}
+                                            onChange={() => {
+                                                setNodeContentType('IMAGE')
+                                                setIsArticleNode(false)
+                                            }}
                                         />
+                                    </label>
+                                )}
+                                {graphType === 'detail' && nodeContentType === 'TEXT' && (
+                                    <label className="ml-4 inline-flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={isArticleNode}
+                                            onChange={(event) =>
+                                                setIsArticleNode(event.target.checked)
+                                            }
+                                        />
+                                        is article
                                     </label>
                                 )}
                             </div>

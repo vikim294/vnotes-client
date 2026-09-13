@@ -39,6 +39,7 @@ export default function NoteNode({
   nodeType,
   shared,
   contentType,
+  article,
   imageUrl,
   isTempImageUrl,
   imageWidth,
@@ -60,6 +61,7 @@ export default function NoteNode({
   const setNodeMenuVisible = paperContext?.setNodeMenuVisible;
   const selectedNodeId = paperContext?.selectedNodeId;
   const setChosenParentNodeId = paperContext?.setChosenParentNodeId;
+  const openArticle = paperContext?.openArticle;
 
   const gRef = useRef<SVGGElement | null>(null);
   const positionRef = useRef({
@@ -230,6 +232,11 @@ export default function NoteNode({
 
   const handleDoubleClick = () => {
     if (!browseMode) {
+      if (graphType === "detail" && article && typeof id === "number") {
+        openArticle?.(id, "view");
+        return;
+      }
+
       if (nodeType === 'DETAIL') {
         navigate(`/noteDetails/${id}?label=${label}`);
       }
@@ -406,6 +413,7 @@ export default function NoteNode({
           markType={markType}
           nodeType={nodeType}
           shared={shared}
+          article={article}
           size={nodeSize}
           setSize={setNodeSize}
         ></NodeLabel>
@@ -508,10 +516,11 @@ interface NodeLabelProps {
   markType?: "GREEN" | "RED" | null;
   nodeType?: NodeType;
   shared?: boolean;
+  article?: boolean;
   size: Size;
   setSize: React.Dispatch<React.SetStateAction<Size>>;
 }
-function NodeLabel({ label, markType, nodeType, shared, size, setSize }: NodeLabelProps) {
+function NodeLabel({ label, markType, nodeType, shared, article, size, setSize }: NodeLabelProps) {
   // lines
   const textList = label.split("\n");
   const textsRef = useRef<Map<number, SVGTextElement>>(new Map());
@@ -544,7 +553,13 @@ function NodeLabel({ label, markType, nodeType, shared, size, setSize }: NodeLab
         y={size.height / -2}
         width={size.width}
         height={size.height}
-        fill={nodeType === 'DETAIL' ? "var(--color-node-detail)" : "var(--color-node)"}
+        fill={
+          article
+            ? "var(--color-node-article)"
+            : nodeType === 'DETAIL'
+              ? "var(--color-node-detail)"
+              : "var(--color-node)"
+        }
         rx="6"
         ry="6"
       />

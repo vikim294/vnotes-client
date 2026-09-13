@@ -1,5 +1,15 @@
 import { createPortal } from 'react-dom'
-import { Trash2, Pencil, Plus, Link, Unlink, Bookmark, Share2, ArrowRightLeft } from 'lucide-react'
+import {
+    Trash2,
+    Pencil,
+    Plus,
+    Link,
+    Unlink,
+    Bookmark,
+    Share2,
+    ArrowRightLeft,
+    FileText,
+} from 'lucide-react'
 import Button from './Button'
 import {
     use,
@@ -44,6 +54,7 @@ interface NodeMenuProps {
     onOpenMark: () => void
     onToggleShare: () => void
     onMoveTo?: () => void
+    onOpenArticle: () => void
     onDelete: () => void
     onClose: () => void
 }
@@ -71,6 +82,7 @@ export default function NodeMenu({
     onOpenMark,
     onToggleShare,
     onMoveTo,
+    onOpenArticle,
     onDelete,
     onClose,
 }: NodeMenuProps) {
@@ -204,6 +216,16 @@ export default function NodeMenu({
                         </div>
                     </Button>
                 )}
+                {graphType === 'detail' &&
+                    selectedNode?.article === true &&
+                    typeof selectedNode.id === 'number' && (
+                        <Button className="block w-full" onClick={onOpenArticle}>
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                edit article
+                            </div>
+                        </Button>
+                    )}
                 {/* 分享功能 - 仅在 directory 视图中的 detail 节点上显示 */}
                 {graphType === 'directory' && selectedNode?.nodeType === 'DETAIL' && (
                     <Button className="block w-full" onClick={onToggleShare}>
