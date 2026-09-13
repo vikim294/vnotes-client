@@ -108,6 +108,8 @@ export interface NoteShareDetail {
 
 export interface NoteShareAccessLog {
     id: number
+    target: 'NOTE' | 'ARTICLE'
+    targetLabel: string | null
     createdAt: string
 }
 
@@ -335,7 +337,7 @@ export async function getSharedNote(
 ): Promise<SharedNoteData> {
     const { accessToken } = getAuthSessionStatus()
     const request = (token?: string) =>
-        fetch(`${API_BASE_URL}/note/shared/${encodeURIComponent(shareToken)}`, {
+        fetch(`${API_BASE_URL}/note/shared/note/${encodeURIComponent(shareToken)}`, {
             signal,
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
@@ -351,6 +353,34 @@ export async function getSharedNote(
     const res = (await response.json()) as ApiResponse<SharedNoteData>
     if (!response.ok || res.code !== 0 || !res.data) {
         throw new Error(res.message || '分享笔记加载失败')
+    }
+
+    return res.data
+}
+
+export async function getSharedArticle(
+    detailNodeId: number,
+    shareToken: string,
+    signal?: AbortSignal
+): Promise<Article> {
+    const { accessToken } = getAuthSessionStatus()
+    const url = `${API_BASE_URL}/note/shared/article/${detailNodeId}/${encodeURIComponent(shareToken)}`
+    const request = (token?: string) =>
+        fetch(url, {
+            signal,
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        })
+
+    let response = await request(accessToken ?? undefined)
+
+    if (response.status === 401 && accessToken && !signal?.aborted) {
+        clearAuthSession()
+        response = await request()
+    }
+
+    const res = (await response.json()) as ApiResponse<Article>
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '分享文章加载失败')
     }
 
     return res.data

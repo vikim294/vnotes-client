@@ -48,6 +48,7 @@ import {
     getNoteShareDetail,
     getTags,
     getUserProfile,
+    getSharedArticle,
     importNotesFromJson,
     moveDetailNode,
     shareNote,
@@ -89,6 +90,7 @@ interface GestureInfo {
 interface NoteGraphProps {
     graphType: 'directory' | 'detail'
     viewMode?: 'owner' | 'shared'
+    shareToken?: string
     noteTitle?: string
     noteTags?: Tag[]
     noteDetail?: NoteDetailData | null
@@ -204,6 +206,7 @@ const NoteGraph = memo<NoteGraphProps>(
     ({
         graphType,
         viewMode = 'owner',
+        shareToken,
         noteTitle,
         noteTags = [],
         noteDetail,
@@ -435,7 +438,9 @@ const NoteGraph = memo<NoteGraphProps>(
             setIsArticleLoading(true)
 
             try {
-                const nextArticle = await getArticle(detailNodeId)
+                const nextArticle = isSharedView
+                    ? await getSharedArticle(detailNodeId, shareToken ?? '')
+                    : await getArticle(detailNodeId)
                 if (requestId !== articleRequestRef.current) return
                 setArticle(nextArticle)
                 setArticleContent(nextArticle.content ?? '')
@@ -447,7 +452,7 @@ const NoteGraph = memo<NoteGraphProps>(
                     setIsArticleLoading(false)
                 }
             }
-        }, [])
+        }, [isSharedView, shareToken])
 
         const openArticle = useCallback(
             (detailNodeId: number, mode: 'view' | 'edit') => {
@@ -1807,21 +1812,19 @@ const NoteGraph = memo<NoteGraphProps>(
                         </div>
                     )}
 
-                    {!isSharedView && (
-                        <div className="fixed top-4 right-4 select-none">
-                            <button
-                                type="button"
-                                onClick={resetView}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
-                                title="重置视图"
-                                aria-label="重置视图"
-                            >
-                                <RotateCcw className="h-5 w-5" />
-                            </button>
-                        </div>
-                    )}
+                    <div className="fixed top-4 right-4 select-none">
+                        <button
+                            type="button"
+                            onClick={resetView}
+                            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                            title="重置视图"
+                            aria-label="重置视图"
+                        >
+                            <RotateCcw className="h-5 w-5" />
+                        </button>
+                    </div>
 
-                    {!isSharedView && !isChoosingParent && chosenParentNodeId === null && (
+                    {!isChoosingParent && chosenParentNodeId === null && (
                         <div className="fixed top-25 right-0 w-36">
                             {!isSaving && (
                                 <div>
@@ -1837,7 +1840,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             )}
 
-                            {allowOperate && (
+                            {!isSharedView && allowOperate && (
                                 <>
                                     {/* search button */}
                                     <div>
@@ -2297,32 +2300,62 @@ const NoteGraph = memo<NoteGraphProps>(
                                                     暂无访问记录
                                                 </div>
                                             ) : (
-                                                <ul className="divide-y divide-slate-800">
-                                                    {shareAccessLogs.map((accessLog) => (
-                                                        <li
-                                                            key={accessLog.id}
-                                                            className="flex items-center gap-3 px-4 py-3"
-                                                        >
-                                                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-500/10 text-indigo-300">
-                                                                <Eye
-                                                                    className="h-4 w-4"
-                                                                    aria-hidden="true"
-                                                                />
-                                                            </span>
-                                                            <span className="text-sm text-slate-300">
-                                                                访问分享笔记
-                                                            </span>
-                                                            <time
-                                                                dateTime={accessLog.createdAt}
-                                                                className="ml-auto text-xs text-slate-500"
-                                                            >
-                                                                {formatShareTime(
-                                                                    accessLog.createdAt
-                                                                )}
-                                                            </time>
-                                                        </li>
-                                                    ))}
-                                                </ul>
+                                                <table className="w-full table-fixed text-left text-sm">
+                                                    <thead className="sticky top-0 z-10 bg-slate-900 text-xs text-slate-400">
+                                                        <tr>
+                                                            <th className="w-28 px-4 py-2 font-medium">
+                                                                访问类型
+                                                            </th>
+                                                            <th className="px-4 py-2 font-medium">
+                                                                目标节点
+                                                            </th>
+                                                            <th className="w-40 px-4 py-2 font-medium">
+                                                                访问时间
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-800">
+                                                        {shareAccessLogs.map((accessLog) => (
+                                                            <tr key={accessLog.id}>
+                                                                <td className="px-4 py-3 align-middle">
+                                                                    <span className="inline-flex items-center gap-2 text-slate-300">
+                                                                        <Eye
+                                                                            className="h-4 w-4 shrink-0 text-indigo-300"
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                        {accessLog.target === 'ARTICLE'
+                                                                            ? '文章'
+                                                                            : '笔记'}
+                                                                    </span>
+                                                                </td>
+                                                                <td
+                                                                    className={`truncate px-4 py-3 align-middle ${
+                                                                        accessLog.targetLabel === null
+                                                                            ? 'text-rose-400'
+                                                                            : 'text-slate-300'
+                                                                    }`}
+                                                                    title={
+                                                                        accessLog.targetLabel ??
+                                                                        '节点已被删除'
+                                                                    }
+                                                                >
+                                                                    {accessLog.targetLabel ??
+                                                                        '节点已被删除'}
+                                                                </td>
+                                                                <td className="px-4 py-3 align-middle">
+                                                                    <time
+                                                                        dateTime={accessLog.createdAt}
+                                                                        className="text-xs text-slate-500"
+                                                                    >
+                                                                        {formatShareTime(
+                                                                            accessLog.createdAt
+                                                                        )}
+                                                                    </time>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             )}
                                         </div>
                                     </section>

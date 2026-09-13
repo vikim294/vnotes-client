@@ -88,6 +88,7 @@ export default function SharedNote() {
         <NoteGraph
             graphType="detail"
             viewMode="shared"
+            shareToken={shareToken}
             noteTitle={sharedNote.title}
             noteTags={sharedNote.tags}
             flatTree={flatTree}
