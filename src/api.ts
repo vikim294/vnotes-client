@@ -461,6 +461,19 @@ export async function getUserProfile(): Promise<UserProfile> {
     return res.data as UserProfile
 }
 
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/user/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword }),
+    })
+    const res = (await response.json()) as ApiResponse<void>
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '修改密码失败')
+    }
+}
+
 export async function getNotifications(signal?: AbortSignal): Promise<Notification[]> {
     const response = await authFetch(`${API_BASE_URL}/notification`, { signal })
     const res = await response.json()

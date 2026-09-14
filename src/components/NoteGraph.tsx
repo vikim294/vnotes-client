@@ -10,6 +10,7 @@ import {
     FileJson,
     FileText,
     Home,
+    KeyRound,
     LoaderCircle,
     LogOut,
     RotateCcw,
@@ -41,6 +42,7 @@ import {
 import {
     API_BASE_URL,
     authFetch,
+    changePassword,
     exportNotesAsJson,
     getArticle,
     getDirectoryTags,
@@ -403,6 +405,20 @@ const NoteGraph = memo<NoteGraphProps>(
         const [isProfileLoading, setIsProfileLoading] = useState(false)
         const [profileError, setProfileError] = useState<string | null>(null)
         const [isAvatarUploading, setIsAvatarUploading] = useState(false)
+
+        // change password
+        const oldPasswordInputRef = useRef<HTMLInputElement>(null)
+        const {
+            Modal: ChangePasswordModal,
+            openModal: openChangePasswordModal,
+            closeModal: closeChangePasswordModal,
+        } = useModal({
+            onModalVisible: useCallback(() => oldPasswordInputRef.current?.focus(), []),
+        })
+        const [oldPassword, setOldPassword] = useState('')
+        const [newPassword, setNewPassword] = useState('')
+        const [changePasswordError, setChangePasswordError] = useState<string | null>(null)
+        const [isChangingPassword, setIsChangingPassword] = useState(false)
 
         // export notes
         const {
@@ -1099,6 +1115,50 @@ const NoteGraph = memo<NoteGraphProps>(
         const handleOpenProfile = () => {
             openProfileModal()
             void loadProfile()
+        }
+
+        const resetChangePasswordForm = () => {
+            setOldPassword('')
+            setNewPassword('')
+            setChangePasswordError(null)
+        }
+
+        const handleOpenChangePassword = () => {
+            resetChangePasswordForm()
+            closeProfileModal()
+            openChangePasswordModal()
+        }
+
+        const handleCancelChangePassword = () => {
+            closeChangePasswordModal()
+            resetChangePasswordForm()
+            openProfileModal()
+        }
+
+        const handleChangePasswordConfirm = async () => {
+            if (oldPassword.length < 8 || newPassword.length < 8) {
+                setChangePasswordError('旧密码和新密码都不能少于 8 位')
+                return
+            }
+            if (oldPassword === newPassword) {
+                setChangePasswordError('新密码不能与旧密码相同')
+                return
+            }
+
+            setIsChangingPassword(true)
+            setChangePasswordError(null)
+            try {
+                await changePassword(oldPassword, newPassword)
+                closeChangePasswordModal()
+                resetChangePasswordForm()
+                Toast.success('密码修改成功')
+            } catch (error) {
+                setChangePasswordError(
+                    error instanceof Error ? error.message : '修改密码失败'
+                )
+            } finally {
+                setIsChangingPassword(false)
+            }
         }
 
         const handleLogout = () => {
@@ -1985,7 +2045,19 @@ const NoteGraph = memo<NoteGraphProps>(
                             width={440}
                             header="个人资料"
                             closeOnClickMask
-                            footer={<Button onClick={closeProfileModal}>关闭</Button>}
+                            footer={
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        type="secondary"
+                                        className="gap-2"
+                                        onClick={handleOpenChangePassword}
+                                    >
+                                        <KeyRound className="h-4 w-4" aria-hidden="true" />
+                                        修改密码
+                                    </Button>
+                                    <Button onClick={closeProfileModal}>关闭</Button>
+                                </div>
+                            }
                         >
                             {isProfileLoading ? (
                                 <div className="flex min-h-72 flex-col items-center justify-center gap-3 text-sm text-slate-400">
@@ -2012,6 +2084,71 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             )}
                         </ProfileModal>
+
+                        <ChangePasswordModal
+                            width={440}
+                            header="修改密码"
+                            footer={
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        onClick={handleCancelChangePassword}
+                                        disabled={isChangingPassword}
+                                    >
+                                        取消
+                                    </Button>
+                                    <Button
+                                        type="primary"
+                                        onClick={() => void handleChangePasswordConfirm()}
+                                        disabled={isChangingPassword}
+                                    >
+                                        {isChangingPassword ? '正在修改...' : '确认修改'}
+                                    </Button>
+                                </div>
+                            }
+                        >
+                            <div className="grid gap-5">
+                                <label className="grid gap-2">
+                                    <span className="text-sm text-slate-300">旧密码</span>
+                                    <input
+                                        ref={oldPasswordInputRef}
+                                        type="password"
+                                        autoComplete="current-password"
+                                        className="input-base outline-none"
+                                        value={oldPassword}
+                                        disabled={isChangingPassword}
+                                        onChange={(event) => {
+                                            setOldPassword(event.target.value)
+                                            setChangePasswordError(null)
+                                        }}
+                                    />
+                                </label>
+                                <label className="grid gap-2">
+                                    <span className="text-sm text-slate-300">新密码</span>
+                                    <input
+                                        type="password"
+                                        autoComplete="new-password"
+                                        className="input-base outline-none"
+                                        value={newPassword}
+                                        disabled={isChangingPassword}
+                                        onChange={(event) => {
+                                            setNewPassword(event.target.value)
+                                            setChangePasswordError(null)
+                                        }}
+                                    />
+                                    <span className="text-xs text-slate-500">
+                                        新密码至少需要 8 位
+                                    </span>
+                                </label>
+                                {changePasswordError && (
+                                    <p
+                                        className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300"
+                                        role="alert"
+                                    >
+                                        {changePasswordError}
+                                    </p>
+                                )}
+                            </div>
+                        </ChangePasswordModal>
 
                         <ExportModal
                             width={420}
