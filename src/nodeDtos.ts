@@ -37,6 +37,8 @@ export const toAddedNodeDto = (node: NodeData): AddedNodeDto => {
         nodeType: node.nodeType,
         contentType: node.contentType,
         article: node.article,
+        refDirectoryNodeId: node.refDirectoryNodeId,
+        refDetailNodeId: node.refDetailNodeId,
         tagIds: node.nodeType === 'DETAIL' ? node.tagIds : undefined,
         ...getParentReference(node),
     }

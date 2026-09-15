@@ -1,64 +1,97 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { type NodeData, type NoteDetailData } from '../../types'
-import { useParams, useSearchParams } from 'react-router'
-import { API_BASE_URL, authFetch } from '../../api'
+import { useParams } from 'react-router'
+import { getDetailNodesByDirectoryNodeId, getDirectoryNodeById } from '../../api'
 import NoteGraph from '../../components/NoteGraph'
 
 function NoteDetail() {
     const [flatTree, setFlatTree] = useState<NodeData[]>([])
-    const [allowOperate, setAllowOperate] = useState(true)
+    const [noteTitle, setNoteTitle] = useState('')
+    const [loadedDirectoryNodeId, setLoadedDirectoryNodeId] = useState<number | null>(null)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const requestIdRef = useRef(0)
 
     // data related
-    const { id: directoryNodeId } = useParams()
-    const [searchParams] = useSearchParams()
-    const noteTitle = searchParams.get('label') || 'Untitled Note'
+    const { id } = useParams()
+    const directoryNodeId = Number(id)
     const noteDetail: NoteDetailData = {
-        directoryNodeId: Number(directoryNodeId)
+        directoryNodeId
     }
 
-    const getNoteDetail = async () => {
-        const response = await authFetch(`${API_BASE_URL}/note/directory/${directoryNodeId}/detail-nodes`)
-        const res = await response.json()
-        if (res.code === 0) {
-            // const isShared = res.data.isShared
+    const loadNoteDetail = useCallback(async (showLoading: boolean) => {
+        if (!Number.isSafeInteger(directoryNodeId) || directoryNodeId <= 0) {
+            setLoadError('无效的笔记 ID')
+            setLoadedDirectoryNodeId(null)
+            return
+        }
 
-            // if (!isShared) {
-            //     navigate('/unauthorized')
-            //     return
-            // }
+        const requestId = ++requestIdRef.current
+        if (showLoading) {
+            setLoadedDirectoryNodeId(null)
+            setLoadError(null)
+        }
 
-            setAllowOperate(true)
+        try {
+            const [directoryNode, detailNodes] = await Promise.all([
+                getDirectoryNodeById(directoryNodeId),
+                getDetailNodesByDirectoryNodeId(directoryNodeId),
+            ])
 
+            if (requestId !== requestIdRef.current) return
+
+            setNoteTitle(directoryNode.label)
             setFlatTree(
-                res.data.map((node: NodeData) => ({
+                detailNodes.map((node) => ({
                     ...node,
                     // 图片节点的后端 label 为 null，画布内部统一使用空字符串。
                     label: node.label ?? '',
-                    x: node.x,
-                    y: node.y,
                 }))
             )
+            setLoadedDirectoryNodeId(directoryNodeId)
+            setLoadError(null)
+        } catch (error) {
+            if (requestId !== requestIdRef.current) return
+
+            setLoadError(error instanceof Error ? error.message : '笔记加载失败')
+            if (showLoading) setLoadedDirectoryNodeId(null)
         }
-    }
+    }, [directoryNodeId])
 
     useEffect(() => {
-        if (directoryNodeId) {
-            // fetch note detail
-            getNoteDetail()
+        void loadNoteDetail(true)
+
+        return () => {
+            requestIdRef.current += 1
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [directoryNodeId])
+    }, [loadNoteDetail])
+
+    if (loadError && loadedDirectoryNodeId !== directoryNodeId) {
+        return (
+            <div className="grid h-full place-items-center bg-black px-6 text-center text-rose-300">
+                {loadError}
+            </div>
+        )
+    }
+
+    if (loadedDirectoryNodeId !== directoryNodeId) {
+        return (
+            <div className="grid h-full place-items-center bg-black text-slate-400">
+                正在加载笔记…
+            </div>
+        )
+    }
 
     return (
         <NoteGraph
+            key={directoryNodeId}
             graphType="detail"
             noteTitle={noteTitle}
             noteDetail={noteDetail}
             flatTree={flatTree}
             setFlatTree={setFlatTree}
-            allowOperate={allowOperate}
-            onExitEdit={getNoteDetail}
+            allowOperate
+            onExitEdit={() => void loadNoteDetail(false)}
         />
     )
 }

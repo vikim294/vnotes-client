@@ -10,7 +10,7 @@ import PaperContext from "../context/paperContext";
 import { findDescendantsByIdInFlatTree } from "../lib";
 import type { Size } from "../types/note";
 import { useNavigate } from "react-router";
-import { Share2 } from "lucide-react";
+import { Link2, Share2 } from "lucide-react";
 import type { NodeData, NodeType } from "../types";
 import { getImageNodeUrl } from "../utils";
 import { Toast } from "../components/Toast";
@@ -44,6 +44,7 @@ export default function NoteNode({
   isTempImageUrl,
   imageWidth,
   imageHeight,
+  refDirectoryNodeId,
 }: NodeData) {
   const navigate = useNavigate();
 
@@ -232,13 +233,22 @@ export default function NoteNode({
 
   const handleDoubleClick = () => {
     if (!browseMode) {
+      if (
+        graphType === "detail" &&
+        contentType === "REF_NOTE" &&
+        typeof refDirectoryNodeId === "number"
+      ) {
+        navigate(`/noteDetails/${refDirectoryNodeId}`);
+        return;
+      }
+
       if (graphType === "detail" && article && typeof id === "number") {
         openArticle?.(id, "view");
         return;
       }
 
       if (nodeType === 'DETAIL') {
-        navigate(`/noteDetails/${id}?label=${label}`);
+        navigate(`/noteDetails/${id}`);
       }
     }
 
@@ -407,13 +417,14 @@ export default function NoteNode({
       onPointerCancel={handlePointerCancel}
       onDoubleClick={handleDoubleClick}
     >
-      {(graphType === "directory" || contentType === 'TEXT') && (
+      {(graphType === "directory" || contentType !== 'IMAGE') && (
         <NodeLabel
           label={label}
           markType={markType}
           nodeType={nodeType}
           shared={shared}
           article={article}
+          isReference={contentType?.startsWith("REF_")}
           size={nodeSize}
           setSize={setNodeSize}
         ></NodeLabel>
@@ -517,10 +528,20 @@ interface NodeLabelProps {
   nodeType?: NodeType;
   shared?: boolean;
   article?: boolean;
+  isReference?: boolean;
   size: Size;
   setSize: React.Dispatch<React.SetStateAction<Size>>;
 }
-function NodeLabel({ label, markType, nodeType, shared, article, size, setSize }: NodeLabelProps) {
+function NodeLabel({
+  label,
+  markType,
+  nodeType,
+  shared,
+  article,
+  isReference,
+  size,
+  setSize,
+}: NodeLabelProps) {
   // lines
   const textList = label.split("\n");
   const textsRef = useRef<Map<number, SVGTextElement>>(new Map());
@@ -581,6 +602,28 @@ function NodeLabel({ label, markType, nodeType, shared, article, size, setSize }
             }}
           >
             <Share2 size={14} color="#3b82f6" />
+          </div>
+        </foreignObject>
+      )}
+
+      {isReference && (
+        <foreignObject
+          x={size.width / 2 - 10}
+          y={size.height / -2 - 10}
+          width={20}
+          height={20}
+        >
+          <div
+            title="引用节点"
+            style={{
+              width: 20,
+              height: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Link2 size={14} color="#a78bfa" />
           </div>
         </foreignObject>
       )}

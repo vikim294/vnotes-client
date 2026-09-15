@@ -109,6 +109,25 @@ const NODE_TEXTAREA_CLASS_NAME =
     'bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] p-2 outline-none'
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
 
+type NodeCreationKind = 'TEXT' | 'IMAGE' | 'ARTICLE' | 'REF'
+type RefTargetType = 'NOTE' | 'DETAIL' | 'ARTICLE'
+
+const REF_CONTENT_TYPE: Record<RefTargetType, NodeContentType> = {
+    NOTE: 'REF_NOTE',
+    DETAIL: 'REF_DETAIL',
+    ARTICLE: 'REF_ARTICLE',
+}
+
+const DETAIL_NODE_CREATION_OPTIONS: Array<{
+    value: NodeCreationKind
+    label: string
+}> = [
+    { value: 'TEXT', label: 'text' },
+    { value: 'IMAGE', label: 'image' },
+    { value: 'ARTICLE', label: 'article' },
+    { value: 'REF', label: 'ref' },
+]
+
 interface TextareaIndentEdit {
     value: string
     selectionStart: number
@@ -291,6 +310,16 @@ const NoteGraph = memo<NoteGraphProps>(
         // for choosing new node content type: text or image
         const [nodeContentType, setNodeContentType] = useState<NodeContentType>('TEXT')
         const [isArticleNode, setIsArticleNode] = useState(false)
+        const [refTargetType, setRefTargetType] = useState<RefTargetType>('NOTE')
+        const [selectedRefTarget, setSelectedRefTarget] = useState<Note | null>(null)
+        const [isRefSearchOpen, setIsRefSearchOpen] = useState(false)
+        const nodeCreationKind: NodeCreationKind = nodeContentType.startsWith('REF_')
+            ? 'REF'
+            : nodeContentType === 'IMAGE'
+              ? 'IMAGE'
+              : isArticleNode
+                ? 'ARTICLE'
+                : 'TEXT'
         // for previewing the selected image file before uploading
         const [tempFileUrl, setTempFileUrl] = useState<string | null>(null)
         const [tempImageSize, setTempImageSize] = useState<{
@@ -443,7 +472,6 @@ const NoteGraph = memo<NoteGraphProps>(
         const [moveSourceNodeId, setMoveSourceNodeId] = useState<number | null>(null)
         const [moveSuccessTarget, setMoveSuccessTarget] = useState<{
             id: number
-            label: string
         } | null>(null)
 
         const loadArticle = useCallback(async (detailNodeId: number) => {
@@ -601,12 +629,146 @@ const NoteGraph = memo<NoteGraphProps>(
             )
         }
 
+        const resetNodeCreationType = () => {
+            setNodeContentType('TEXT')
+            setIsArticleNode(false)
+            setRefTargetType('NOTE')
+            setSelectedRefTarget(null)
+            setIsRefSearchOpen(false)
+        }
+
+        const handleNodeCreationKindChange = (kind: NodeCreationKind) => {
+            setSelectedRefTarget(null)
+
+            if (kind === 'ARTICLE') {
+                setNodeContentType('TEXT')
+                setIsArticleNode(true)
+                return
+            }
+
+            setIsArticleNode(false)
+            if (kind === 'REF') {
+                setRefTargetType('NOTE')
+                setNodeContentType('REF_NOTE')
+                return
+            }
+
+            setNodeContentType(kind)
+        }
+
+        const handleRefTargetTypeChange = (targetType: RefTargetType) => {
+            setRefTargetType(targetType)
+            setNodeContentType(REF_CONTENT_TYPE[targetType])
+            setSelectedRefTarget(null)
+        }
+
+        const validateRefNodeForCreate = () => {
+            if (!nodeContentType.startsWith('REF_')) return true
+            if (nodeContentType !== 'REF_NOTE') {
+                Toast.warning('详情节点和文章节点引用暂未支持')
+                return false
+            }
+            if (!nodeEditContent.trim()) {
+                Toast.error('请输入引用节点的文本内容')
+                return false
+            }
+            if (!selectedRefTarget) {
+                Toast.error('请先选择引用目标')
+                return false
+            }
+            if (selectedRefTarget.id === noteDetail?.directoryNodeId) {
+                Toast.error('不能引用当前笔记')
+                return false
+            }
+            return true
+        }
+
+        const renderNodeCreationTypeControls = () => {
+            if (graphType !== 'detail') return null
+
+            return (
+                <div className="mb-4 grid gap-4">
+                    <fieldset>
+                        <legend className="mb-2 text-sm text-slate-400">节点内容类型</legend>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {DETAIL_NODE_CREATION_OPTIONS.map((option) => (
+                                <label
+                                    key={option.value}
+                                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                        nodeCreationKind === option.value
+                                            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-200'
+                                            : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="node-creation-kind"
+                                        checked={nodeCreationKind === option.value}
+                                        onChange={() =>
+                                            handleNodeCreationKindChange(option.value)
+                                        }
+                                        className="accent-indigo-500"
+                                    />
+                                    {option.label}
+                                </label>
+                            ))}
+                        </div>
+                    </fieldset>
+
+                    {nodeCreationKind === 'REF' && (
+                        <label className="grid gap-2 text-sm text-slate-400">
+                            引用目标类型
+                            <select
+                                value={refTargetType}
+                                onChange={(event) =>
+                                    handleRefTargetTypeChange(
+                                        event.target.value as RefTargetType
+                                    )
+                                }
+                                className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500"
+                            >
+                                <option value="NOTE">笔记</option>
+                                <option value="DETAIL">详情节点（暂未支持）</option>
+                                <option value="ARTICLE">文章节点（暂未支持）</option>
+                            </select>
+                        </label>
+                    )}
+                </div>
+            )
+        }
+
+        const renderRefTargetSelection = () => {
+            if (nodeCreationKind !== 'REF') return null
+
+            return (
+                <div className="mt-4">
+                    {refTargetType === 'NOTE' ? (
+                        <Button
+                            type="secondary"
+                            className="max-w-full gap-2"
+                            onClick={() => setIsRefSearchOpen(true)}
+                        >
+                            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <span className="truncate">
+                                {selectedRefTarget
+                                    ? `引用目标：${selectedRefTarget.label}`
+                                    : '选择目标'}
+                            </span>
+                        </Button>
+                    ) : (
+                        <p className="text-sm text-amber-300">
+                            该引用目标类型暂未支持，请先选择“笔记”
+                        </p>
+                    )}
+                </div>
+            )
+        }
+
         const handleAddNewNode = () => {
             setNodeEditContent('')
             setNodeType('DIRECTORY')
             resetTagSelection()
-            setNodeContentType('TEXT')
-            setIsArticleNode(false)
+            resetNodeCreationType()
             setTempFileUrl(null)
             setTempImageSize(null)
             tempFileRef.current = null
@@ -756,7 +918,7 @@ const NoteGraph = memo<NoteGraphProps>(
             onExitEdit()
         }
 
-        const resetView = () => {
+        const resetView = useCallback(() => {
             // Clear cached viewport for directory
             if (graphType === 'directory') {
                 localStorage.removeItem(VIEWPORT_STORAGE_KEY)
@@ -781,7 +943,7 @@ const NoteGraph = memo<NoteGraphProps>(
                     zoom: 1,
                 }))
             }
-        }
+        }, [flatTree, graphType, paperSize])
 
         const handleNodeEdit = () => {
             const nodeToEdit = flatTree.find((node) => node.id === selectedNodeId)
@@ -807,8 +969,7 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeEditContent('')
             setNodeType('DIRECTORY')
             resetTagSelection()
-            setNodeContentType('TEXT')
-            setIsArticleNode(false)
+            resetNodeCreationType()
             setTempFileUrl(null)
             setTempImageSize(null)
             tempFileRef.current = null
@@ -1233,7 +1394,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
                 setFlatTree((prev) => prev.filter((node) => !allIdsToRemove.has(node.id)))
                 setEditMode(false)
-                setMoveSuccessTarget({ id: note.id, label: note.label })
+                setMoveSuccessTarget({ id: note.id })
             } catch (error) {
                 Toast.error(error instanceof Error ? error.message : '详情节点移动失败')
             } finally {
@@ -1251,6 +1412,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 Toast.error('请上传图片后再确认')
                 return
             }
+            if (!validateRefNodeForCreate()) return
 
             const id = uuidv4()
             const newNode: NodeData = {
@@ -1267,6 +1429,9 @@ const NoteGraph = memo<NoteGraphProps>(
                     graphType === 'detail' && nodeContentType === 'TEXT'
                         ? isArticleNode
                         : undefined,
+                refDirectoryNodeId:
+                    nodeContentType === 'REF_NOTE' ? selectedRefTarget?.id : undefined,
+                refDetailNodeId: undefined,
                 // directory graph only
                 nodeType,
                 tagIds:
@@ -1341,6 +1506,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 Toast.error('请上传图片后再确认')
                 return
             }
+            if (!validateRefNodeForCreate()) return
 
             const pNode = flatTree.find((item) => item.id === selectedNodeId) as NodeData
 
@@ -1364,6 +1530,9 @@ const NoteGraph = memo<NoteGraphProps>(
                         graphType === 'detail' && nodeContentType === 'TEXT'
                             ? isArticleNode
                             : undefined,
+                    refDirectoryNodeId:
+                        nodeContentType === 'REF_NOTE' ? selectedRefTarget?.id : undefined,
+                    refDetailNodeId: undefined,
                     // directory graph only
                     nodeType,
                     tagIds:
@@ -1394,6 +1563,9 @@ const NoteGraph = memo<NoteGraphProps>(
                         graphType === 'detail' && nodeContentType === 'TEXT'
                             ? isArticleNode
                             : undefined,
+                    refDirectoryNodeId:
+                        nodeContentType === 'REF_NOTE' ? selectedRefTarget?.id : undefined,
+                    refDetailNodeId: undefined,
                     // directory graph only
                     nodeType,
                     tagIds:
@@ -1712,10 +1884,14 @@ const NoteGraph = memo<NoteGraphProps>(
         useEffect(() => {
             if (hasMountedRef.current) return
 
+            if (graphType === 'detail' && viewport.width > 0 && viewport.height > 0) {
+                hasMountedRef.current = true
+                resetView()
+                return
+            }
+
             if (flatTree.length > 0 && viewport.width > 0 && viewport.height > 0) {
                 hasMountedRef.current = true
-
-                const firstRootNode = flatTree.find((node) => node.parentId === null) as NodeData
 
                 if (graphType === 'directory') {
                     const cached = loadViewportState()
@@ -1737,13 +1913,9 @@ const NoteGraph = memo<NoteGraphProps>(
                     }
                 }
 
-                setViewport((prev) => ({
-                    ...prev,
-                    x: firstRootNode.x - viewport.width / 2,
-                    y: firstRootNode.y - viewport.height / 2,
-                }))
+                resetView()
             }
-        }, [graphType, paperSize, flatTree, viewport.width, viewport.height])
+        }, [graphType, flatTree, resetView, viewport.width, viewport.height])
 
         return (
             <PaperContext value={paperContext}>
@@ -2691,45 +2863,9 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             }
                         >
-                            <div className="mb-4">
-                                <label className="mr-4">
-                                    text
-                                    <input
-                                        type="radio"
-                                        name="opStatus"
-                                        checked={nodeContentType === 'TEXT'}
-                                        onChange={() => setNodeContentType('TEXT')}
-                                    />
-                                </label>
-                                {graphType === 'detail' && (
-                                    <label>
-                                        image
-                                        <input
-                                            type="radio"
-                                            name="opStatus"
-                                            checked={nodeContentType === 'IMAGE'}
-                                            onChange={() => {
-                                                setNodeContentType('IMAGE')
-                                                setIsArticleNode(false)
-                                            }}
-                                        />
-                                    </label>
-                                )}
-                                {graphType === 'detail' && nodeContentType === 'TEXT' && (
-                                    <label className="ml-4 inline-flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={isArticleNode}
-                                            onChange={(event) =>
-                                                setIsArticleNode(event.target.checked)
-                                            }
-                                        />
-                                        is article
-                                    </label>
-                                )}
-                            </div>
+                            {renderNodeCreationTypeControls()}
                             <div>
-                                {nodeContentType === 'TEXT' ? (
+                                {nodeContentType !== 'IMAGE' ? (
                                     <textarea
                                         ref={newNodeAddModalInputRef}
                                         className={NODE_TEXTAREA_CLASS_NAME}
@@ -2750,6 +2886,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     </>
                                 )}
                             </div>
+                            {renderRefTargetSelection()}
                             {graphType === 'directory' && nodeType === 'DETAIL' && (
                                 <TagCheckboxGroup
                                     tags={selectableTags}
@@ -2843,45 +2980,9 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             }
                         >
-                            <div className="mb-4">
-                                <label className="mr-4">
-                                    text
-                                    <input
-                                        type="radio"
-                                        name="opStatus"
-                                        checked={nodeContentType === 'TEXT'}
-                                        onChange={() => setNodeContentType('TEXT')}
-                                    />
-                                </label>
-                                {graphType === 'detail' && (
-                                    <label>
-                                        image
-                                        <input
-                                            type="radio"
-                                            name="opStatus"
-                                            checked={nodeContentType === 'IMAGE'}
-                                            onChange={() => {
-                                                setNodeContentType('IMAGE')
-                                                setIsArticleNode(false)
-                                            }}
-                                        />
-                                    </label>
-                                )}
-                                {graphType === 'detail' && nodeContentType === 'TEXT' && (
-                                    <label className="ml-4 inline-flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={isArticleNode}
-                                            onChange={(event) =>
-                                                setIsArticleNode(event.target.checked)
-                                            }
-                                        />
-                                        is article
-                                    </label>
-                                )}
-                            </div>
+                            {renderNodeCreationTypeControls()}
                             <div>
-                                {nodeContentType === 'TEXT' ? (
+                                {nodeContentType !== 'IMAGE' ? (
                                     <textarea
                                         ref={nodeAddModalInputRef}
                                         className={NODE_TEXTAREA_CLASS_NAME}
@@ -2902,6 +3003,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     </>
                                 )}
                             </div>
+                            {renderRefTargetSelection()}
                             {graphType === 'directory' && nodeType === 'DETAIL' && (
                                 <TagCheckboxGroup
                                     tags={selectableTags}
@@ -2943,11 +3045,7 @@ const NoteGraph = memo<NoteGraphProps>(
                         <SearchModal
                             isOpen={isSearchModalOpen}
                             onClose={() => setIsSearchModalOpen(false)}
-                            onSelectNote={(note: Note) =>
-                                navigate(
-                                    `/noteDetails/${note.id}?label=${encodeURIComponent(note.label)}`
-                                )
-                            }
+                            onSelectNote={(note: Note) => navigate(`/noteDetails/${note.id}`)}
                         />
                         <TrashBinModal
                             isOpen={isTrashBinOpen}
@@ -2962,6 +3060,19 @@ const NoteGraph = memo<NoteGraphProps>(
                             isOpen={isTagManagementOpen}
                             onClose={() => setIsTagManagementOpen(false)}
                         />
+                        {isRefSearchOpen && (
+                            <SearchModal
+                                isOpen={isRefSearchOpen}
+                                onClose={() => setIsRefSearchOpen(false)}
+                                onSelectNote={(note) => {
+                                    setSelectedRefTarget(note)
+                                    setIsRefSearchOpen(false)
+                                }}
+                                mode="select"
+                                selectionPurpose="reference"
+                                excludeNoteId={noteDetail?.directoryNodeId}
+                            />
+                        )}
                         {/* Move search modal */}
                         {isMoveSearchOpen && (
                             <SearchModal
@@ -2982,7 +3093,6 @@ const NoteGraph = memo<NoteGraphProps>(
                                 isOpen={true}
                                 onClose={() => setMoveSuccessTarget(null)}
                                 targetNoteId={moveSuccessTarget.id}
-                                targetNoteLabel={moveSuccessTarget.label}
                             />
                         )}
                     </>

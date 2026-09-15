@@ -20,13 +20,15 @@ export interface NodeData {
   imageUrl?: string;
   imageWidth?: number;
   imageHeight?: number;
+  refDirectoryNodeId?: number | null;
+  refDetailNodeId?: number | null;
   tagIds?: number[];
 }
 
 export type NodeType = "DIRECTORY" | "DETAIL";
 export type MarkType = "GREEN" | "RED" | null;
 export type OpStatus = "new" | "edited" | "deleted";
-export type NodeContentType = 'TEXT' | 'IMAGE'
+export type NodeContentType = 'TEXT' | 'IMAGE' | 'REF_NOTE' | 'REF_DETAIL' | 'REF_ARTICLE'
 
 interface NodeMutationFields {
   label: string | null;
@@ -45,6 +47,8 @@ export interface AddedNodeDto extends NodeMutationFields {
   nodeType?: NodeType;
   contentType?: NodeContentType;
   article?: boolean;
+  refDirectoryNodeId?: number | null;
+  refDetailNodeId?: number | null;
   tagIds?: number[];
 }
 

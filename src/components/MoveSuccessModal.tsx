@@ -6,16 +6,15 @@ interface MoveSuccessModalProps {
     isOpen: boolean
     onClose: () => void
     targetNoteId: number
-    targetNoteLabel: string
 }
 
-export default function MoveSuccessModal({ isOpen, onClose, targetNoteId, targetNoteLabel }: MoveSuccessModalProps) {
+export default function MoveSuccessModal({ isOpen, onClose, targetNoteId }: MoveSuccessModalProps) {
     const navigate = useNavigate()
 
     if (!isOpen) return null
 
     const handleGoToCheck = () => {
-        navigate(`/noteDetails/${targetNoteId}?label=${encodeURIComponent(targetNoteLabel)}`)
+        navigate(`/noteDetails/${targetNoteId}`)
         onClose()
     }
 

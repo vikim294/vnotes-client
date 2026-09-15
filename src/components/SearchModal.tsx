@@ -29,6 +29,7 @@ interface SearchModalProps {
     onClose: () => void
     onSelectNote: (note: Note) => void
     mode?: 'navigate' | 'select'
+    selectionPurpose?: 'move' | 'reference'
     excludeNoteId?: number
 }
 
@@ -63,6 +64,7 @@ export default function SearchModal({
     onClose,
     onSelectNote,
     mode = 'navigate',
+    selectionPurpose = 'move',
     excludeNoteId,
 }: SearchModalProps) {
     const [query, setQuery] = useState('')
@@ -243,7 +245,9 @@ export default function SearchModal({
                                 </h2>
                                 <p className="mt-1 text-xs text-slate-500">
                                     {mode === 'select'
-                                        ? '查找并选择一个详情节点作为移动目标'
+                                        ? selectionPurpose === 'reference'
+                                            ? '查找并选择一个带详情的目录节点作为引用目标'
+                                            : '查找并选择一个详情节点作为移动目标'
                                         : '按名称、节点类型或创建日期查找内容'}
                                 </p>
                             </div>

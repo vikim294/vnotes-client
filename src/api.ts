@@ -40,6 +40,12 @@ export interface Note {
     updatedAt: string
 }
 
+export interface DirectoryNodeInfo {
+    id: number
+    label: string
+    nodeType: NodeType
+}
+
 export interface TrashBinDirectoryNode {
     id: number
     label: string
@@ -66,6 +72,37 @@ export interface PageResponse<T> {
     page: number
     pageSize: number
     total: number
+}
+
+export async function getDirectoryNodeById(
+    id: number,
+    signal?: AbortSignal
+): Promise<DirectoryNodeInfo> {
+    const response = await authFetch(`${API_BASE_URL}/note/directory/${id}`, { signal })
+    const res = (await response.json()) as ApiResponse<DirectoryNodeInfo>
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '笔记信息加载失败')
+    }
+
+    return res.data
+}
+
+export async function getDetailNodesByDirectoryNodeId(
+    directoryNodeId: number,
+    signal?: AbortSignal
+): Promise<NodeData[]> {
+    const response = await authFetch(
+        `${API_BASE_URL}/note/directory/${directoryNodeId}/detail-nodes`,
+        { signal }
+    )
+    const res = (await response.json()) as ApiResponse<NodeData[]>
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '详情节点加载失败')
+    }
+
+    return res.data
 }
 
 export interface UserProfile {
