@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
     CalendarDays,
@@ -182,13 +182,6 @@ export default function SearchModal({
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [isOpen, onClose])
 
-    const filteredList = useMemo(
-        () =>
-            excludeNoteId === undefined
-                ? result.list
-                : result.list.filter((note) => note.id !== excludeNoteId),
-        [excludeNoteId, result.list]
-    )
     const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize))
     const pageItems = getPageItems(page, totalPages)
     const activeFilterCount =
@@ -398,13 +391,16 @@ export default function SearchModal({
                             <div className="flex min-h-64 items-center justify-center px-4 text-center text-sm text-rose-400">
                                 {error}
                             </div>
-                        ) : filteredList.length === 0 ? (
+                        ) : result.list.length === 0 ? (
                             <div className="flex min-h-64 items-center justify-center px-4 text-center text-sm text-slate-500">
                                 没有找到符合条件的节点
                             </div>
                         ) : (
                             <ul className="divide-surface-700 divide-y">
-                                {filteredList.map((note) => (
+                                {result.list.map((note) => {
+                                    const isCurrentNote = note.id === excludeNoteId
+
+                                    return (
                                     <li key={note.id}>
                                         <div className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-slate-200">
                                             {note.nodeType === 'DETAIL' ? (
@@ -453,15 +449,22 @@ export default function SearchModal({
                                             {note.nodeType === 'DETAIL' && (
                                                 <button
                                                     type="button"
+                                                    disabled={isCurrentNote}
                                                     onClick={() => handleSelectNote(note)}
-                                                    className="cursor-pointer rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-500"
+                                                    title={isCurrentNote ? '当前正在查看的笔记' : undefined}
+                                                    className="cursor-pointer rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                                                 >
-                                                    {mode === 'select' ? '选择' : '进入'}
+                                                    {isCurrentNote
+                                                        ? '当前笔记'
+                                                        : mode === 'select'
+                                                          ? '选择'
+                                                          : '进入'}
                                                 </button>
                                             )}
                                         </div>
                                     </li>
-                                ))}
+                                    )
+                                })}
                             </ul>
                         )}
                     </div>

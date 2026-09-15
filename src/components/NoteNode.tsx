@@ -238,7 +238,9 @@ export default function NoteNode({
         contentType === "REF_NOTE" &&
         typeof refDirectoryNodeId === "number"
       ) {
-        navigate(`/noteDetails/${refDirectoryNodeId}`);
+        navigate(`/noteDetails/${refDirectoryNodeId}`, {
+          state: { resetView: true },
+        });
         return;
       }
 
@@ -248,7 +250,7 @@ export default function NoteNode({
       }
 
       if (nodeType === 'DETAIL') {
-        navigate(`/noteDetails/${id}`);
+        navigate(`/noteDetails/${id}`, { state: { resetView: true } });
       }
     }
 

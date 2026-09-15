@@ -20,7 +20,7 @@ import {
     Upload,
 } from 'lucide-react'
 import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { clearAuthSession } from '../authSession'
 import Button from '../components/Button'
 import NodeMenu, { type NodeMenuExpose } from '../components/NodeMenu'
@@ -103,6 +103,8 @@ interface NoteGraphProps {
 }
 
 const VIEWPORT_STORAGE_KEY = 'vnote-directory-viewport'
+const DETAIL_VIEWPORT_STORAGE_PREFIX = 'vnote-detail-viewport'
+const DETAIL_RESET_CONSUMED_PREFIX = 'vnote-detail-reset-consumed'
 const NODE_LABEL_MAX_LENGTH = 8192
 const NODE_INDENT = '    '
 const NODE_TEXTAREA_CLASS_NAME =
@@ -223,6 +225,45 @@ const saveViewportState = (viewport: { x: number; y: number; zoom: number }) => 
     }
 }
 
+interface StoredViewport {
+    x: number
+    y: number
+    zoom: number
+}
+
+const loadDetailViewportState = (storageKey: string): StoredViewport | null => {
+    try {
+        const stored = sessionStorage.getItem(storageKey)
+        return stored ? (JSON.parse(stored) as StoredViewport) : null
+    } catch {
+        return null
+    }
+}
+
+const saveDetailViewportState = (storageKey: string, viewport: StoredViewport) => {
+    try {
+        sessionStorage.setItem(storageKey, JSON.stringify(viewport))
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+const hasConsumedDetailReset = (storageKey: string) => {
+    try {
+        return sessionStorage.getItem(storageKey) === 'true'
+    } catch {
+        return false
+    }
+}
+
+const markDetailResetConsumed = (storageKey: string) => {
+    try {
+        sessionStorage.setItem(storageKey, 'true')
+    } catch {
+        // Ignore storage errors
+    }
+}
+
 const NoteGraph = memo<NoteGraphProps>(
     ({
         graphType,
@@ -237,8 +278,21 @@ const NoteGraph = memo<NoteGraphProps>(
         allowOperate = true,
     }) => {
         const navigate = useNavigate()
+        const location = useLocation()
         const isSharedView = viewMode === 'shared'
         const hasMountedRef = useRef(false)
+        const detailHistoryKey =
+            graphType === 'detail' && !isSharedView && noteDetail
+                ? `${noteDetail.directoryNodeId}:${location.key}`
+                : null
+        const detailViewportStorageKey = detailHistoryKey
+            ? `${DETAIL_VIEWPORT_STORAGE_PREFIX}:${detailHistoryKey}`
+            : null
+        const detailResetConsumedKey = detailHistoryKey
+            ? `${DETAIL_RESET_CONSUMED_PREFIX}:${detailHistoryKey}`
+            : null
+        const shouldResetDetailView =
+            (location.state as { resetView?: boolean } | null)?.resetView === true
 
         const [paperSize, setPaperSize] = useState({ width: 0, height: 0 })
         const [viewport, setViewport] = useState({
@@ -264,15 +318,24 @@ const NoteGraph = memo<NoteGraphProps>(
             viewportStartZoom: 1,
         })
 
+        const saveActiveViewport = useCallback(
+            (nextViewport: StoredViewport) => {
+                if (graphType === 'directory') {
+                    saveViewportState(nextViewport)
+                } else if (detailViewportStorageKey) {
+                    saveDetailViewportState(detailViewportStorageKey, nextViewport)
+                }
+            },
+            [detailViewportStorageKey, graphType]
+        )
+
         // Debounced save for zoom operations (pinch/zoom and wheel)
         const debouncedSaveViewport = useMemo(
             () =>
                 debounce<{ x: number; y: number; zoom: number }>(({ x, y, zoom }) => {
-                    if (graphType === 'directory') {
-                        saveViewportState({ x, y, zoom })
-                    }
+                    saveActiveViewport({ x, y, zoom })
                 }, 300),
-            [graphType]
+            [saveActiveViewport]
         )
 
         // const [isAllExpanded, setIsAllExpand] = useState(true);
@@ -926,24 +989,36 @@ const NoteGraph = memo<NoteGraphProps>(
 
             const firstRootNode = flatTree.find((node) => node.parentId === null) as NodeData | undefined
 
-            if (firstRootNode) {
-                setViewport((prev) => ({
-                    ...prev,
-                    width: paperSize.width,
-                    height: paperSize.height,
-                    zoom: 1,
-                    x: firstRootNode.x - paperSize.width / 2,
-                    y: firstRootNode.y - paperSize.height / 2,
-                }))
-            } else {
-                setViewport((prev) => ({
-                    ...prev,
-                    width: paperSize.width,
-                    height: paperSize.height,
-                    zoom: 1,
-                }))
-            }
-        }, [flatTree, graphType, paperSize])
+            setViewport((prev) => {
+                const nextViewport = firstRootNode
+                    ? {
+                          ...prev,
+                          width: paperSize.width,
+                          height: paperSize.height,
+                          zoom: 1,
+                          x: firstRootNode.x - paperSize.width / 2,
+                          y: firstRootNode.y - paperSize.height / 2,
+                      }
+                    : {
+                          ...prev,
+                          width: paperSize.width,
+                          height: paperSize.height,
+                          zoom: 1,
+                          x: 0,
+                          y: 0,
+                      }
+
+                if (detailViewportStorageKey) {
+                    saveDetailViewportState(detailViewportStorageKey, {
+                        x: nextViewport.x,
+                        y: nextViewport.y,
+                        zoom: nextViewport.zoom,
+                    })
+                }
+
+                return nextViewport
+            })
+        }, [detailViewportStorageKey, flatTree, graphType, paperSize])
 
         const handleNodeEdit = () => {
             const nodeToEdit = flatTree.find((node) => node.id === selectedNodeId)
@@ -1780,12 +1855,9 @@ const NoteGraph = memo<NoteGraphProps>(
             }
 
             const onPointerUp = () => {
-                if (
-                    (gestureData.type === 'panning' || gestureData.type === 'pinchAndZoom') &&
-                    graphType === 'directory'
-                ) {
+                if (gestureData.type === 'panning' || gestureData.type === 'pinchAndZoom') {
                     const v = viewportRef.current
-                    saveViewportState({ x: v.x, y: v.y, zoom: v.zoom })
+                    saveActiveViewport({ x: v.x, y: v.y, zoom: v.zoom })
                 }
 
                 gestureData.type = 'none'
@@ -1823,7 +1895,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 paperEl?.removeEventListener('pointermove', onPointerMove)
                 paperEl?.removeEventListener('pointerup', onPointerUp)
             }
-        }, [graphType, paperSize, editMode, browseMode, debouncedSaveViewport])
+        }, [paperSize, editMode, browseMode, saveActiveViewport])
 
         // zooming
         useEffect(() => {
@@ -1855,13 +1927,11 @@ const NoteGraph = memo<NoteGraphProps>(
                     const newX = prev.x + deltaX
                     const newY = prev.y + deltaY
 
-                    if (graphType === 'directory') {
-                        debouncedSaveViewport({
-                            x: newX,
-                            y: newY,
-                            zoom: newZoom,
-                        })
-                    }
+                    debouncedSaveViewport({
+                        x: newX,
+                        y: newY,
+                        zoom: newZoom,
+                    })
 
                     return {
                         x: newX,
@@ -1878,7 +1948,7 @@ const NoteGraph = memo<NoteGraphProps>(
             return () => {
                 paperEl?.removeEventListener('wheel', onWheel)
             }
-        }, [graphType, paperSize, debouncedSaveViewport])
+        }, [paperSize, debouncedSaveViewport])
 
         // init viewport
         useEffect(() => {
@@ -1886,7 +1956,32 @@ const NoteGraph = memo<NoteGraphProps>(
 
             if (graphType === 'detail' && viewport.width > 0 && viewport.height > 0) {
                 hasMountedRef.current = true
+
+                const resetWasConsumed = detailResetConsumedKey
+                    ? hasConsumedDetailReset(detailResetConsumedKey)
+                    : false
+                const savedViewport = detailViewportStorageKey
+                    ? loadDetailViewportState(detailViewportStorageKey)
+                    : null
+
+                if (!shouldResetDetailView || resetWasConsumed) {
+                    if (savedViewport) {
+                        setViewport((prev) => ({
+                            ...prev,
+                            x: savedViewport.x,
+                            y: savedViewport.y,
+                            zoom: savedViewport.zoom,
+                            width: paperSize.width * savedViewport.zoom,
+                            height: paperSize.height * savedViewport.zoom,
+                        }))
+                        return
+                    }
+                }
+
                 resetView()
+                if (shouldResetDetailView && detailResetConsumedKey) {
+                    markDetailResetConsumed(detailResetConsumedKey)
+                }
                 return
             }
 
@@ -1915,7 +2010,30 @@ const NoteGraph = memo<NoteGraphProps>(
 
                 resetView()
             }
-        }, [graphType, flatTree, resetView, viewport.width, viewport.height])
+        }, [
+            detailResetConsumedKey,
+            detailViewportStorageKey,
+            flatTree,
+            graphType,
+            paperSize,
+            resetView,
+            shouldResetDetailView,
+            viewport.height,
+            viewport.width,
+        ])
+
+        useEffect(() => {
+            return () => {
+                if (!detailViewportStorageKey || !hasMountedRef.current) return
+
+                const currentViewport = viewportRef.current
+                saveDetailViewportState(detailViewportStorageKey, {
+                    x: currentViewport.x,
+                    y: currentViewport.y,
+                    zoom: currentViewport.zoom,
+                })
+            }
+        }, [detailViewportStorageKey])
 
         return (
             <PaperContext value={paperContext}>
@@ -3045,7 +3163,14 @@ const NoteGraph = memo<NoteGraphProps>(
                         <SearchModal
                             isOpen={isSearchModalOpen}
                             onClose={() => setIsSearchModalOpen(false)}
-                            onSelectNote={(note: Note) => navigate(`/noteDetails/${note.id}`)}
+                            excludeNoteId={
+                                graphType === 'detail' ? noteDetail?.directoryNodeId : undefined
+                            }
+                            onSelectNote={(note: Note) =>
+                                navigate(`/noteDetails/${note.id}`, {
+                                    state: { resetView: true },
+                                })
+                            }
                         />
                         <TrashBinModal
                             isOpen={isTrashBinOpen}

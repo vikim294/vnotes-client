@@ -14,7 +14,7 @@ export default function MoveSuccessModal({ isOpen, onClose, targetNoteId }: Move
     if (!isOpen) return null
 
     const handleGoToCheck = () => {
-        navigate(`/noteDetails/${targetNoteId}`)
+        navigate(`/noteDetails/${targetNoteId}`, { state: { resetView: true } })
         onClose()
     }
 
