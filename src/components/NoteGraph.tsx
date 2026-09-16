@@ -72,6 +72,7 @@ import NotificationModal from './NotificationModal'
 import TagManagementModal from './TagManagementModal'
 import DirectoryTags, { NoteTagList } from './DirectoryTags'
 import TagCheckboxGroup from './TagCheckboxGroup'
+import DetailNodePickerModal from './DetailNodePickerModal'
 import GraphViewer, { type GraphViewport, type StoredGraphViewport } from './GraphViewer'
 
 interface NoteGraphProps {
@@ -354,7 +355,10 @@ const NoteGraph = memo<NoteGraphProps>(
         const [isArticleNode, setIsArticleNode] = useState(false)
         const [refTargetType, setRefTargetType] = useState<RefTargetType>('NOTE')
         const [selectedRefTarget, setSelectedRefTarget] = useState<Note | null>(null)
+        const [selectedRefDetailTarget, setSelectedRefDetailTarget] =
+            useState<NodeData | null>(null)
         const [isRefSearchOpen, setIsRefSearchOpen] = useState(false)
+        const [isRefNodePickerOpen, setIsRefNodePickerOpen] = useState(false)
         const nodeCreationKind: NodeCreationKind = nodeContentType.startsWith('REF_')
             ? 'REF'
             : nodeContentType === 'IMAGE'
@@ -678,11 +682,16 @@ const NoteGraph = memo<NoteGraphProps>(
             setIsArticleNode(false)
             setRefTargetType('NOTE')
             setSelectedRefTarget(null)
+            setSelectedRefDetailTarget(null)
             setIsRefSearchOpen(false)
+            setIsRefNodePickerOpen(false)
         }
 
         const handleNodeCreationKindChange = (kind: NodeCreationKind) => {
             setSelectedRefTarget(null)
+            setSelectedRefDetailTarget(null)
+            setIsRefSearchOpen(false)
+            setIsRefNodePickerOpen(false)
 
             if (kind === 'ARTICLE') {
                 setNodeContentType('TEXT')
@@ -704,24 +713,31 @@ const NoteGraph = memo<NoteGraphProps>(
             setRefTargetType(targetType)
             setNodeContentType(REF_CONTENT_TYPE[targetType])
             setSelectedRefTarget(null)
+            setSelectedRefDetailTarget(null)
+            setIsRefSearchOpen(false)
+            setIsRefNodePickerOpen(false)
         }
 
         const validateRefNodeForCreate = () => {
             if (!nodeContentType.startsWith('REF_')) return true
-            if (nodeContentType !== 'REF_NOTE') {
-                Toast.warning('详情节点和文章节点引用暂未支持')
-                return false
-            }
             if (!nodeEditContent.trim()) {
                 Toast.error('请输入引用节点的文本内容')
                 return false
             }
-            if (!selectedRefTarget) {
+
+            if (nodeContentType === 'REF_NOTE' && !selectedRefTarget) {
                 Toast.error('请先选择引用目标')
                 return false
             }
-            if (selectedRefTarget.id === noteDetail?.directoryNodeId) {
+            if (
+                nodeContentType === 'REF_NOTE' &&
+                selectedRefTarget?.id === noteDetail?.directoryNodeId
+            ) {
                 Toast.error('不能引用当前笔记')
+                return false
+            }
+            if (nodeContentType !== 'REF_NOTE' && !selectedRefDetailTarget) {
+                Toast.error('请先选择引用目标')
                 return false
             }
             return true
@@ -772,8 +788,8 @@ const NoteGraph = memo<NoteGraphProps>(
                                 className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500"
                             >
                                 <option value="NOTE">笔记</option>
-                                <option value="DETAIL">详情节点（暂未支持）</option>
-                                <option value="ARTICLE">文章节点（暂未支持）</option>
+                                <option value="DETAIL">详情节点</option>
+                                <option value="ARTICLE">文章节点</option>
                             </select>
                         </label>
                     )}
@@ -786,24 +802,26 @@ const NoteGraph = memo<NoteGraphProps>(
 
             return (
                 <div className="mt-4">
-                    {refTargetType === 'NOTE' ? (
-                        <Button
-                            type="secondary"
-                            className="max-w-full gap-2"
-                            onClick={() => setIsRefSearchOpen(true)}
-                        >
-                            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-                            <span className="truncate">
-                                {selectedRefTarget
-                                    ? `引用目标：${selectedRefTarget.label}`
-                                    : '选择目标'}
-                            </span>
-                        </Button>
-                    ) : (
-                        <p className="text-sm text-amber-300">
-                            该引用目标类型暂未支持，请先选择“笔记”
-                        </p>
-                    )}
+                    <Button
+                        type="secondary"
+                        className="max-w-full gap-2"
+                        onClick={() => setIsRefSearchOpen(true)}
+                    >
+                        <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                            {refTargetType === 'NOTE' && selectedRefTarget
+                                ? `引用目标：${selectedRefTarget.label}`
+                                : refTargetType !== 'NOTE' && selectedRefDetailTarget
+                                  ? `引用目标：${
+                                        selectedRefDetailTarget.contentType === 'IMAGE'
+                                            ? '图片节点'
+                                            : selectedRefDetailTarget.label
+                                    }`
+                                  : refTargetType === 'NOTE'
+                                    ? '选择目标'
+                                    : '选择目录'}
+                        </span>
+                    </Button>
                 </div>
             )
         }
@@ -1569,7 +1587,12 @@ const NoteGraph = memo<NoteGraphProps>(
                         : undefined,
                 refDirectoryNodeId:
                     nodeContentType === 'REF_NOTE' ? selectedRefTarget?.id : undefined,
-                refDetailNodeId: undefined,
+                refDetailNodeId:
+                    nodeContentType === 'REF_DETAIL' || nodeContentType === 'REF_ARTICLE'
+                        ? typeof selectedRefDetailTarget?.id === 'number'
+                            ? selectedRefDetailTarget.id
+                            : undefined
+                        : undefined,
                 // directory graph only
                 nodeType,
                 tagIds:
@@ -1671,7 +1694,12 @@ const NoteGraph = memo<NoteGraphProps>(
                             : undefined,
                     refDirectoryNodeId:
                         nodeContentType === 'REF_NOTE' ? selectedRefTarget?.id : undefined,
-                    refDetailNodeId: undefined,
+                    refDetailNodeId:
+                        nodeContentType === 'REF_DETAIL' || nodeContentType === 'REF_ARTICLE'
+                            ? typeof selectedRefDetailTarget?.id === 'number'
+                                ? selectedRefDetailTarget.id
+                                : undefined
+                            : undefined,
                     // directory graph only
                     nodeType,
                     tagIds:
@@ -1704,7 +1732,12 @@ const NoteGraph = memo<NoteGraphProps>(
                             : undefined,
                     refDirectoryNodeId:
                         nodeContentType === 'REF_NOTE' ? selectedRefTarget?.id : undefined,
-                    refDetailNodeId: undefined,
+                    refDetailNodeId:
+                        nodeContentType === 'REF_DETAIL' || nodeContentType === 'REF_ARTICLE'
+                            ? typeof selectedRefDetailTarget?.id === 'number'
+                                ? selectedRefDetailTarget.id
+                                : undefined
+                            : undefined,
                     // directory graph only
                     nodeType,
                     tagIds:
@@ -2905,13 +2938,37 @@ const NoteGraph = memo<NoteGraphProps>(
                                 onClose={() => setIsRefSearchOpen(false)}
                                 onSelectNote={(note) => {
                                     setSelectedRefTarget(note)
+                                    setSelectedRefDetailTarget(null)
                                     setIsRefSearchOpen(false)
+                                    if (refTargetType !== 'NOTE') {
+                                        setIsRefNodePickerOpen(true)
+                                    }
                                 }}
                                 mode="select"
-                                selectionPurpose="reference"
-                                excludeNoteId={noteDetail?.directoryNodeId}
+                                selectionPurpose={
+                                    refTargetType === 'NOTE' ? 'reference' : 'reference-node'
+                                }
+                                excludeNoteId={
+                                    refTargetType === 'NOTE'
+                                        ? noteDetail?.directoryNodeId
+                                        : undefined
+                                }
                             />
                         )}
+                        <DetailNodePickerModal
+                            isOpen={isRefNodePickerOpen}
+                            directory={selectedRefTarget}
+                            targetType={refTargetType === 'ARTICLE' ? 'ARTICLE' : 'DETAIL'}
+                            onClose={() => {
+                                setIsRefNodePickerOpen(false)
+                                setSelectedRefTarget(null)
+                                setSelectedRefDetailTarget(null)
+                            }}
+                            onConfirm={(node) => {
+                                setSelectedRefDetailTarget(node)
+                                setIsRefNodePickerOpen(false)
+                            }}
+                        />
                         {/* Move search modal */}
                         {isMoveSearchOpen && (
                             <SearchModal

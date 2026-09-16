@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Link2, Share2 } from "lucide-react";
+import { CircleCheck, Link2, Share2 } from "lucide-react";
 
 import imageNotFoundUrl from "../../assets/image_not_found.webp";
 import type { NodeData, NodeType } from "../types";
@@ -10,6 +10,7 @@ interface NoteNodeViewProps {
   node: NodeData;
   graphType: "directory" | "detail";
   browseMode?: boolean;
+  selected?: boolean;
   size?: Size;
   onSizeChange?: React.Dispatch<React.SetStateAction<Size>>;
 }
@@ -18,6 +19,7 @@ export default function NoteNodeView({
   node,
   graphType,
   browseMode = false,
+  selected = false,
   size: controlledSize,
   onSizeChange,
 }: NoteNodeViewProps) {
@@ -53,6 +55,28 @@ export default function NoteNodeView({
           size={size}
           setSize={setSize}
         />
+      )}
+
+      {selected && (
+        <foreignObject
+          x={size.width / -2 - 10}
+          y={size.height / -2 - 10}
+          width={20}
+          height={20}
+        >
+          <div
+            title="已选择"
+            style={{
+              width: 20,
+              height: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CircleCheck size={16} color="#818cf8" />
+          </div>
+        </foreignObject>
       )}
 
       {/* expand icon */}

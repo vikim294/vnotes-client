@@ -29,7 +29,7 @@ interface SearchModalProps {
     onClose: () => void
     onSelectNote: (note: Note) => void
     mode?: 'navigate' | 'select'
-    selectionPurpose?: 'move' | 'reference'
+    selectionPurpose?: 'move' | 'reference' | 'reference-node'
     excludeNoteId?: number
 }
 
@@ -234,11 +234,17 @@ export default function SearchModal({
                         <div className="mb-4 flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-lg font-semibold tracking-tight text-slate-100">
-                                    {mode === 'select' ? '选择目标笔记' : '搜索笔记'}
+                                    {mode === 'select'
+                                        ? selectionPurpose === 'reference-node'
+                                            ? '选择目标目录'
+                                            : '选择目标笔记'
+                                        : '搜索笔记'}
                                 </h2>
                                 <p className="mt-1 text-xs text-slate-500">
                                     {mode === 'select'
-                                        ? selectionPurpose === 'reference'
+                                        ? selectionPurpose === 'reference-node'
+                                            ? '先选择一个带详情的目录节点，再从详情画布中选择引用目标'
+                                            : selectionPurpose === 'reference'
                                             ? '查找并选择一个带详情的目录节点作为引用目标'
                                             : '查找并选择一个详情节点作为移动目标'
                                         : '按名称、节点类型或创建日期查找内容'}
@@ -265,7 +271,11 @@ export default function SearchModal({
                                     resetPage()
                                 }}
                                 placeholder={
-                                    mode === 'select' ? '输入目标笔记名称…' : '输入节点名称…'
+                                    mode === 'select'
+                                        ? selectionPurpose === 'reference-node'
+                                            ? '输入目标目录名称…'
+                                            : '输入目标笔记名称…'
+                                        : '输入节点名称…'
                                 }
                                 className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none! placeholder:text-slate-500"
                             />
@@ -469,7 +479,7 @@ export default function SearchModal({
                         )}
                     </div>
 
-                    <div className="sticky left-0 right-0 bottom-0 border-surface-700 flex flex-col gap-3 border-t bg-slate-900/55 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="sticky left-0 right-0 bottom-0 border-surface-700 flex flex-col gap-3 border-t bg-black px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-slate-400">
                             共 <span className="font-medium text-slate-200">{result.total}</span> 条，
                             第 <span className="font-medium text-slate-200">{page}</span> / {totalPages} 页

@@ -85,6 +85,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         zoom: 1,
     })
     const viewportRef = useRef(viewport)
+    const containerRef = useRef<HTMLDivElement>(null)
     const paperRef = useRef<SVGSVGElement>(null)
     const hasInitializedRef = useRef(false)
     const hasAppliedInitialViewportRef = useRef(false)
@@ -164,8 +165,12 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
 
     useLayoutEffect(() => {
         const updateSize = () => {
-            const width = window.innerWidth
-            const height = window.innerHeight
+            const container = containerRef.current
+            if (!container) return
+
+            const { width, height } = container.getBoundingClientRect()
+            if (width <= 0 || height <= 0) return
+
             setPaperSize({ width, height })
             setViewport((previous) => ({
                 ...previous,
@@ -174,10 +179,11 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             }))
         }
 
-        window.addEventListener('resize', updateSize)
         updateSize()
+        const resizeObserver = new ResizeObserver(updateSize)
+        if (containerRef.current) resizeObserver.observe(containerRef.current)
 
-        return () => window.removeEventListener('resize', updateSize)
+        return () => resizeObserver.disconnect()
     }, [])
 
     // init viewport
@@ -238,8 +244,11 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             const firstPointer = { x: gesture.startX1, y: gesture.startY1 }
             const secondPointer = { x: gesture.startX2, y: gesture.startY2 }
             gesture.startD = getDistanceBetweenTwoPoints(firstPointer, secondPointer)
-            gesture.centerPointX = (firstPointer.x + secondPointer.x) / 2
-            gesture.centerPointY = (firstPointer.y + secondPointer.y) / 2
+            const paperRect = paperElement?.getBoundingClientRect()
+            gesture.centerPointX =
+                (firstPointer.x + secondPointer.x) / 2 - (paperRect?.left ?? 0)
+            gesture.centerPointY =
+                (firstPointer.y + secondPointer.y) / 2 - (paperRect?.top ?? 0)
             gesture.viewportStartX = currentViewport.x
             gesture.viewportStartY = currentViewport.y
             gesture.viewportStartZoom = currentViewport.zoom
@@ -351,8 +360,9 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                 // console.log(newZoom)
 
                 // the position ratio of pointer in the paper
-                const ratioX = event.clientX / paperSize.width
-                const ratioY = event.clientY / paperSize.height
+                const paperRect = paperElement?.getBoundingClientRect()
+                const ratioX = (event.clientX - (paperRect?.left ?? 0)) / paperSize.width
+                const ratioY = (event.clientY - (paperRect?.top ?? 0)) / paperSize.height
                 const deltaX = paperSize.width * -(nextZoom - previous.zoom) * ratioX
                 const deltaY = paperSize.height * -(nextZoom - previous.zoom) * ratioY
                 const nextViewport = {
@@ -383,7 +393,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
     }, [commitViewport])
 
     return (
-        <>
+        <div ref={containerRef} className="relative h-full w-full overflow-hidden">
             <svg
                 ref={paperRef}
                 data-testid="note-graph"
@@ -397,7 +407,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                 <NoteTree flatTree={nodes} renderNode={renderNode} />
             </svg>
             {showResetView && (
-                <div className="fixed top-4 right-4 select-none">
+                <div className="absolute top-4 right-4 select-none">
                     <button
                         type="button"
                         onClick={() => {
@@ -412,7 +422,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                     </button>
                 </div>
             )}
-        </>
+        </div>
     )
 })
 
