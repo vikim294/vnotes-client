@@ -389,8 +389,10 @@ const NoteGraph = memo<NoteGraphProps>(
             width: number
             height: number
         } | null>(null)
+        const [imagePickerResetKey, setImagePickerResetKey] = useState(0)
         // for uploading
         const tempFileRef = useRef<File | null>(null)
+        const imageReadRequestRef = useRef(0)
         // for uploading(add)
         const uuidToFileMapRef = useRef<Record<string, File>>({})
 
@@ -827,14 +829,130 @@ const NoteGraph = memo<NoteGraphProps>(
             )
         }
 
+        const clearPendingImage = () => {
+            imageReadRequestRef.current += 1
+            tempFileRef.current = null
+            setTempFileUrl(null)
+            setTempImageSize(null)
+            setImagePickerResetKey((current) => current + 1)
+        }
+
+        const loadPendingImage = (file: File, source: 'picker' | 'clipboard') => {
+            if (!file.type.startsWith('image/')) {
+                Toast.error('请选择或粘贴图片文件')
+                return
+            }
+
+            const requestId = ++imageReadRequestRef.current
+            const reader = new FileReader()
+
+            reader.onload = () => {
+                if (requestId !== imageReadRequestRef.current) return
+
+                const result = reader.result
+                if (typeof result !== 'string') {
+                    Toast.error('无法读取图片')
+                    return
+                }
+
+                const image = new Image()
+                image.onload = () => {
+                    if (requestId !== imageReadRequestRef.current) return
+
+                    tempFileRef.current = file
+                    setTempFileUrl(result)
+                    setTempImageSize({
+                        width: image.naturalWidth,
+                        height: image.naturalHeight,
+                    })
+                    if (source === 'clipboard') Toast.success('图片已粘贴')
+                }
+                image.onerror = () => Toast.error('无法读取图片内容')
+                image.src = result
+            }
+            reader.onerror = () => Toast.error('无法读取图片文件')
+            reader.readAsDataURL(file)
+        }
+
+        const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0]
+            if (file) loadPendingImage(file, 'picker')
+        }
+
+        const handleImagePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+            if (graphType !== 'detail') return
+
+            const imageItem = Array.from(event.clipboardData.items).find(
+                (item) => item.kind === 'file' && item.type.startsWith('image/')
+            )
+            if (!imageItem) return
+
+            const clipboardFile = imageItem.getAsFile()
+            if (!clipboardFile) return
+
+            event.preventDefault()
+            setNodeContentType('IMAGE')
+            setIsArticleNode(false)
+            setSelectedRefTarget(null)
+            setImagePickerResetKey((current) => current + 1)
+
+            const extension = clipboardFile.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png'
+            const file = clipboardFile.name
+                ? clipboardFile
+                : new File([clipboardFile], `pasted-image-${Date.now()}.${extension}`, {
+                      type: clipboardFile.type,
+                  })
+            loadPendingImage(file, 'clipboard')
+        }
+
+        const renderImageInput = () => (
+            <div
+                tabIndex={0}
+                className="rounded-xl border border-dashed border-slate-600 bg-slate-950/40 p-4 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <FilePicker
+                        handleFileChange={handleFileChange}
+                        resetKey={imagePickerResetKey}
+                    />
+                    <p className="text-xs text-slate-400">
+                        或直接按 <kbd className="rounded bg-slate-800 px-1.5 py-0.5">Ctrl / ⌘ + V</kbd>{' '}
+                        粘贴图片
+                    </p>
+                </div>
+
+                {tempFileUrl && tempImageSize ? (
+                    <div className="mt-4 overflow-hidden rounded-lg border border-slate-700 bg-black/40">
+                        <img
+                            src={tempFileUrl}
+                            alt="待添加图片预览"
+                            className="mx-auto max-h-80 max-w-full object-contain"
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 px-3 py-2.5">
+                            <span className="min-w-0 truncate text-xs text-slate-400">
+                                {tempFileRef.current?.name || '剪贴板图片'} · {tempImageSize.width} ×{' '}
+                                {tempImageSize.height}
+                            </span>
+                            <Button type="danger" className="gap-2" onClick={clearPendingImage}>
+                                <Trash2 className="h-4 w-4" />
+                                删除图片
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mt-4 grid min-h-32 place-items-center rounded-lg bg-slate-900/60 px-4 text-center text-sm text-slate-500">
+                        请选择图片文件，或将截图和剪贴板图片直接粘贴到弹窗中
+                    </div>
+                )}
+            </div>
+        )
+
         const handleAddNewNode = () => {
             setNodeEditContent('')
             setNodeType('DIRECTORY')
             resetTagSelection()
             resetNodeCreationType()
-            setTempFileUrl(null)
-            setTempImageSize(null)
-            tempFileRef.current = null
+            clearPendingImage()
             openNewNodeAddModal()
         }
 
@@ -1045,9 +1163,7 @@ const NoteGraph = memo<NoteGraphProps>(
             setNodeType('DIRECTORY')
             resetTagSelection()
             resetNodeCreationType()
-            setTempFileUrl(null)
-            setTempImageSize(null)
-            tempFileRef.current = null
+            clearPendingImage()
             openNodeAddModal()
         }
 
@@ -1529,6 +1645,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
             setFlatTree((prev) => [...prev, newNode])
 
+            clearPendingImage()
             resetTagSelection()
             closeNewNodeAddModal()
         }
@@ -1664,6 +1781,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
             setFlatTree((prev) => [...prev, newNode])
 
+            clearPendingImage()
             resetTagSelection()
             closeNodeAddModal()
             handleNodeMenuClose()
@@ -1703,30 +1821,6 @@ const NoteGraph = memo<NoteGraphProps>(
 
             closeNodeDeleteConfirmModal()
             handleNodeMenuClose()
-        }
-
-        const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-            const file = e.target.files?.[0]
-            if (!file) return
-
-            // console.log("selected file:", file);
-            const fr = new FileReader()
-            fr.readAsDataURL(file)
-            fr.onload = () => {
-                const result = fr.result as string
-                const image = new Image()
-                image.onload = () => {
-                    setTempFileUrl(result)
-                    setTempImageSize({
-                        width: image.naturalWidth,
-                        height: image.naturalHeight,
-                    })
-                    tempFileRef.current = file
-                }
-                image.onerror = () => Toast.error('无法读取所选图片')
-                image.src = result
-            }
-            fr.onerror = () => Toast.error('无法读取所选图片')
         }
 
         useLayoutEffect(() => {
@@ -2969,6 +3063,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     )}
                                     <Button
                                         onClick={() => {
+                                            clearPendingImage()
                                             resetTagSelection()
                                             closeNewNodeAddModal()
                                         }}
@@ -2981,40 +3076,36 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             }
                         >
-                            {renderNodeCreationTypeControls()}
-                            <div>
-                                {nodeContentType !== 'IMAGE' ? (
-                                    <textarea
-                                        ref={newNodeAddModalInputRef}
-                                        className={NODE_TEXTAREA_CLASS_NAME}
-                                        wrap="off"
-                                        rows={6}
-                                        maxLength={NODE_LABEL_MAX_LENGTH}
-                                        value={nodeEditContent}
-                                        onChange={(e) => setNodeEditContent(e.target.value)}
-                                        onKeyDown={handleNodeTextareaKeyDown}
+                            <div onPaste={handleImagePaste}>
+                                {renderNodeCreationTypeControls()}
+                                <div>
+                                    {nodeContentType !== 'IMAGE' ? (
+                                        <textarea
+                                            ref={newNodeAddModalInputRef}
+                                            className={NODE_TEXTAREA_CLASS_NAME}
+                                            wrap="off"
+                                            rows={6}
+                                            maxLength={NODE_LABEL_MAX_LENGTH}
+                                            value={nodeEditContent}
+                                            onChange={(e) => setNodeEditContent(e.target.value)}
+                                            onKeyDown={handleNodeTextareaKeyDown}
+                                        />
+                                    ) : (
+                                        renderImageInput()
+                                    )}
+                                </div>
+                                {renderRefTargetSelection()}
+                                {graphType === 'directory' && nodeType === 'DETAIL' && (
+                                    <TagCheckboxGroup
+                                        tags={selectableTags}
+                                        selectedTagIds={selectedTagIds}
+                                        isLoading={isTagSelectionLoading}
+                                        error={tagSelectionError}
+                                        onToggle={toggleSelectedTag}
+                                        onRetry={() => void loadTagSelection()}
                                     />
-                                ) : (
-                                    <>
-                                        <FilePicker handleFileChange={handleFileChange} />
-                                        <div className="mt-4">
-                                            {/* image preview */}
-                                            {tempFileUrl && <img src={tempFileUrl} />}
-                                        </div>
-                                    </>
                                 )}
                             </div>
-                            {renderRefTargetSelection()}
-                            {graphType === 'directory' && nodeType === 'DETAIL' && (
-                                <TagCheckboxGroup
-                                    tags={selectableTags}
-                                    selectedTagIds={selectedTagIds}
-                                    isLoading={isTagSelectionLoading}
-                                    error={tagSelectionError}
-                                    onToggle={toggleSelectedTag}
-                                    onRetry={() => void loadTagSelection()}
-                                />
-                            )}
                         </NewNodeAddModal>
 
                         <NodeEditModal
@@ -3086,6 +3177,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     )}
                                     <Button
                                         onClick={() => {
+                                            clearPendingImage()
                                             resetTagSelection()
                                             closeNodeAddModal()
                                         }}
@@ -3098,40 +3190,36 @@ const NoteGraph = memo<NoteGraphProps>(
                                 </div>
                             }
                         >
-                            {renderNodeCreationTypeControls()}
-                            <div>
-                                {nodeContentType !== 'IMAGE' ? (
-                                    <textarea
-                                        ref={nodeAddModalInputRef}
-                                        className={NODE_TEXTAREA_CLASS_NAME}
-                                        wrap="off"
-                                        rows={6}
-                                        maxLength={NODE_LABEL_MAX_LENGTH}
-                                        value={nodeEditContent}
-                                        onChange={(e) => setNodeEditContent(e.target.value)}
-                                        onKeyDown={handleNodeTextareaKeyDown}
+                            <div onPaste={handleImagePaste}>
+                                {renderNodeCreationTypeControls()}
+                                <div>
+                                    {nodeContentType !== 'IMAGE' ? (
+                                        <textarea
+                                            ref={nodeAddModalInputRef}
+                                            className={NODE_TEXTAREA_CLASS_NAME}
+                                            wrap="off"
+                                            rows={6}
+                                            maxLength={NODE_LABEL_MAX_LENGTH}
+                                            value={nodeEditContent}
+                                            onChange={(e) => setNodeEditContent(e.target.value)}
+                                            onKeyDown={handleNodeTextareaKeyDown}
+                                        />
+                                    ) : (
+                                        renderImageInput()
+                                    )}
+                                </div>
+                                {renderRefTargetSelection()}
+                                {graphType === 'directory' && nodeType === 'DETAIL' && (
+                                    <TagCheckboxGroup
+                                        tags={selectableTags}
+                                        selectedTagIds={selectedTagIds}
+                                        isLoading={isTagSelectionLoading}
+                                        error={tagSelectionError}
+                                        onToggle={toggleSelectedTag}
+                                        onRetry={() => void loadTagSelection()}
                                     />
-                                ) : (
-                                    <>
-                                        <FilePicker handleFileChange={handleFileChange} />
-                                        <div className="mt-4">
-                                            {/* image preview */}
-                                            {tempFileUrl && <img src={tempFileUrl} />}
-                                        </div>
-                                    </>
                                 )}
                             </div>
-                            {renderRefTargetSelection()}
-                            {graphType === 'directory' && nodeType === 'DETAIL' && (
-                                <TagCheckboxGroup
-                                    tags={selectableTags}
-                                    selectedTagIds={selectedTagIds}
-                                    isLoading={isTagSelectionLoading}
-                                    error={tagSelectionError}
-                                    onToggle={toggleSelectedTag}
-                                    onRetry={() => void loadTagSelection()}
-                                />
-                            )}
                         </NodeAddModal>
 
                         <NodeDeleteConfirmModal
