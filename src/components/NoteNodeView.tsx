@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { CircleCheck, Link2, Share2 } from "lucide-react";
 
 import imageNotFoundUrl from "../../assets/image_not_found.webp";
-import type { NodeData, NodeType } from "../types";
+import type { NodeContentType, NodeData, NodeType } from "../types";
 import type { Size } from "../types/note";
 import { getImageNodeUrl } from "../utils";
 
@@ -40,6 +40,7 @@ export default function NoteNodeView({
           shared={node.shared}
           article={node.article}
           isReference={node.contentType?.startsWith("REF_")}
+          contentType={node.contentType}
           browseMode={browseMode}
           size={size}
           setSize={setSize}
@@ -166,6 +167,7 @@ interface NodeLabelProps {
   shared?: boolean;
   article?: boolean;
   isReference?: boolean;
+  contentType?: NodeContentType;
   browseMode: boolean;
   size: Size;
   setSize: React.Dispatch<React.SetStateAction<Size>>;
@@ -178,6 +180,7 @@ function NodeLabel({
   shared,
   article,
   isReference,
+  contentType,
   browseMode,
   size,
   setSize,
@@ -260,7 +263,16 @@ function NodeLabel({
               justifyContent: "center",
             }}
           >
-            <Link2 size={14} color="#a78bfa" />
+            <Link2
+              size={14}
+              color={
+                contentType === "REF_NOTE"
+                  ? "#60a5fa"
+                  : contentType === "REF_DETAIL"
+                    ? "#34d399"
+                    : "#fbbf24"
+              }
+            />
           </div>
         </foreignObject>
       )}

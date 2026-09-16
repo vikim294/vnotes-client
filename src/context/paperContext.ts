@@ -16,6 +16,7 @@ const PaperContext = createContext<{
   setSelectedNodeId: React.Dispatch<React.SetStateAction<number | string | null>>;
   setChosenParentNodeId: React.Dispatch<React.SetStateAction<number | string | null>>;
   openArticle: (detailNodeId: number, mode: "view" | "edit") => void;
+  openReferencedDetailNode: (detailNodeId: number) => void;
 } | null>(null);
 
 export default PaperContext;

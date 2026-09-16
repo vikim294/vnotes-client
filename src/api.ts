@@ -46,6 +46,11 @@ export interface DirectoryNodeInfo {
     nodeType: NodeType
 }
 
+export interface DetailNodeLocation {
+    id: number
+    directoryNodeId: number
+}
+
 export interface TrashBinDirectoryNode {
     id: number
     label: string
@@ -83,6 +88,20 @@ export async function getDirectoryNodeById(
 
     if (!response.ok || res.code !== 0 || !res.data) {
         throw new Error(res.message || '笔记信息加载失败')
+    }
+
+    return res.data
+}
+
+export async function getDetailNodeLocation(
+    id: number,
+    signal?: AbortSignal
+): Promise<DetailNodeLocation> {
+    const response = await authFetch(`${API_BASE_URL}/note/detail/${id}`, { signal })
+    const res = (await response.json()) as ApiResponse<DetailNodeLocation>
+
+    if (!response.ok || res.code !== 0 || !res.data) {
+        throw new Error(res.message || '详情节点信息加载失败')
     }
 
     return res.data

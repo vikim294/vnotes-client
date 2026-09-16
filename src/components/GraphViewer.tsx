@@ -27,6 +27,7 @@ export interface GraphViewport extends StoredGraphViewport {
 
 export interface GraphViewerHandle {
     resetView: () => void
+    centerOn: (x: number, y: number) => void
     getViewport: () => GraphViewport
 }
 
@@ -34,6 +35,7 @@ interface GraphViewerProps {
     nodes: NodeData[]
     panFromNodes?: boolean
     initialViewport?: StoredGraphViewport | null
+    initialCenter?: { x: number; y: number } | null
     resetOnMount?: boolean
     showResetView?: boolean
     renderNode?: (node: NodeData) => ReactNode
@@ -67,6 +69,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         nodes,
         panFromNodes = false,
         initialViewport = null,
+        initialCenter = null,
         resetOnMount = false,
         showResetView = true,
         renderNode,
@@ -140,13 +143,31 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         commitViewport(toStoredViewport(nextViewport))
     }, [commitViewport, nodes, paperSize])
 
+    const centerOn = useCallback(
+        (x: number, y: number, zoom = viewportRef.current.zoom || 1) => {
+            if (paperSize.width <= 0 || paperSize.height <= 0) return
+
+            const nextViewport: GraphViewport = {
+                x: x - (paperSize.width * zoom) / 2,
+                y: y - (paperSize.height * zoom) / 2,
+                width: paperSize.width * zoom,
+                height: paperSize.height * zoom,
+                zoom,
+            }
+            setViewport(nextViewport)
+            commitViewport(toStoredViewport(nextViewport))
+        },
+        [commitViewport, paperSize]
+    )
+
     useImperativeHandle(
         ref,
         () => ({
             resetView,
+            centerOn,
             getViewport: () => viewportRef.current,
         }),
-        [resetView]
+        [centerOn, resetView]
     )
 
     // Debounced save for zoom operations (pinch/zoom and wheel)
@@ -196,6 +217,10 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         const timer = window.setTimeout(() => {
             didApplyViewport = true
             hasAppliedInitialViewportRef.current = true
+            if (initialCenter) {
+                centerOn(initialCenter.x, initialCenter.y, 1)
+                return
+            }
             if (!resetOnMount && initialViewport) {
                 setViewport({
                     x: initialViewport.x,
@@ -214,7 +239,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             window.clearTimeout(timer)
             if (!didApplyViewport) hasInitializedRef.current = false
         }
-    }, [initialViewport, nodes.length, paperSize, resetOnMount, resetView])
+    }, [centerOn, initialCenter, initialViewport, nodes.length, paperSize, resetOnMount, resetView])
 
     // panning and pinch & zoom
     useEffect(() => {

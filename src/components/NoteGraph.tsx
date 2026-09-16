@@ -43,6 +43,7 @@ import {
     changePassword,
     exportNotesAsJson,
     getArticle,
+    getDetailNodeLocation,
     getDirectoryTags,
     getNoteShareAccessLogs,
     getNoteShareDetail,
@@ -73,7 +74,11 @@ import TagManagementModal from './TagManagementModal'
 import DirectoryTags, { NoteTagList } from './DirectoryTags'
 import TagCheckboxGroup from './TagCheckboxGroup'
 import DetailNodePickerModal from './DetailNodePickerModal'
-import GraphViewer, { type GraphViewport, type StoredGraphViewport } from './GraphViewer'
+import GraphViewer, {
+    type GraphViewerHandle,
+    type GraphViewport,
+    type StoredGraphViewport,
+} from './GraphViewer'
 
 interface NoteGraphProps {
     graphType: 'directory' | 'detail'
@@ -91,6 +96,7 @@ interface NoteGraphProps {
 const VIEWPORT_STORAGE_KEY = 'vnote-directory-viewport'
 const DETAIL_VIEWPORT_STORAGE_PREFIX = 'vnote-detail-viewport'
 const DETAIL_RESET_CONSUMED_PREFIX = 'vnote-detail-reset-consumed'
+const DETAIL_FOCUS_CONSUMED_PREFIX = 'vnote-detail-focus-consumed'
 const NODE_LABEL_MAX_LENGTH = 8192
 const NODE_INDENT = '    '
 const NODE_TEXTAREA_CLASS_NAME =
@@ -244,6 +250,22 @@ const markDetailResetConsumed = (storageKey: string) => {
     }
 }
 
+const hasConsumedDetailFocus = (storageKey: string) => {
+    try {
+        return sessionStorage.getItem(storageKey) === 'true'
+    } catch {
+        return false
+    }
+}
+
+const markDetailFocusConsumed = (storageKey: string) => {
+    try {
+        sessionStorage.setItem(storageKey, 'true')
+    } catch {
+        // Ignore storage errors
+    }
+}
+
 const NoteGraph = memo<NoteGraphProps>(
     ({
         graphType,
@@ -270,28 +292,62 @@ const NoteGraph = memo<NoteGraphProps>(
         const detailResetConsumedKey = detailHistoryKey
             ? `${DETAIL_RESET_CONSUMED_PREFIX}:${detailHistoryKey}`
             : null
-        const shouldResetDetailView =
-            (location.state as { resetView?: boolean } | null)?.resetView === true
+        const navigationState = location.state as {
+            resetView?: boolean
+            focusNodeId?: number
+        } | null
+        const shouldResetDetailView = navigationState?.resetView === true
+        const focusNodeId =
+            typeof navigationState?.focusNodeId === 'number'
+                ? navigationState.focusNodeId
+                : null
+        const detailFocusConsumedKey =
+            detailHistoryKey && focusNodeId !== null
+                ? `${DETAIL_FOCUS_CONSUMED_PREFIX}:${detailHistoryKey}:${focusNodeId}`
+                : null
         const [graphInitialView] = useState<{
             viewport: StoredGraphViewport | null
             resetOnMount: boolean
+            initialCenter: { x: number; y: number } | null
         }>(() => {
             const resetWasConsumed = detailResetConsumedKey
                 ? hasConsumedDetailReset(detailResetConsumedKey)
                 : false
+            const focusWasConsumed = detailFocusConsumedKey
+                ? hasConsumedDetailFocus(detailFocusConsumedKey)
+                : false
+            const focusNode =
+                focusNodeId === null
+                    ? null
+                    : flatTree.find((node) => node.id === focusNodeId) ?? null
+            const initialCenter =
+                graphType === 'detail' && focusNode && !focusWasConsumed
+                    ? { x: focusNode.x, y: focusNode.y }
+                    : null
             const resetOnMount =
-                graphType === 'detail' && shouldResetDetailView && !resetWasConsumed
+                initialCenter === null &&
+                graphType === 'detail' &&
+                shouldResetDetailView &&
+                !resetWasConsumed
 
             if (graphType === 'directory') {
-                return { viewport: loadViewportState(), resetOnMount: false }
+                return {
+                    viewport: loadViewportState(),
+                    resetOnMount: false,
+                    initialCenter: null,
+                }
+            }
+            if (initialCenter) {
+                return { viewport: null, resetOnMount: false, initialCenter }
             }
             if (detailViewportStorageKey && !resetOnMount) {
                 return {
                     viewport: loadDetailViewportState(detailViewportStorageKey),
                     resetOnMount,
+                    initialCenter: null,
                 }
             }
-            return { viewport: null, resetOnMount }
+            return { viewport: null, resetOnMount, initialCenter: null }
         })
 
         const [viewport, setViewport] = useState<GraphViewport>({
@@ -301,6 +357,7 @@ const NoteGraph = memo<NoteGraphProps>(
             height: 0,
             zoom: 1,
         })
+        const graphViewerRef = useRef<GraphViewerHandle>(null)
         const saveActiveViewport = useCallback(
             (nextViewport: StoredGraphViewport) => {
                 if (graphType === 'directory') {
@@ -317,6 +374,12 @@ const NoteGraph = memo<NoteGraphProps>(
                 markDetailResetConsumed(detailResetConsumedKey)
             }
         }, [detailResetConsumedKey, graphInitialView.resetOnMount])
+
+        useEffect(() => {
+            if (graphInitialView.initialCenter && detailFocusConsumedKey) {
+                markDetailFocusConsumed(detailFocusConsumedKey)
+            }
+        }, [detailFocusConsumedKey, graphInitialView.initialCenter])
 
         // const [isAllExpanded, setIsAllExpand] = useState(true);
 
@@ -557,6 +620,44 @@ const NoteGraph = memo<NoteGraphProps>(
             [loadArticle, openArticleModal]
         )
 
+        const openReferencedDetailNode = useCallback(
+            (detailNodeId: number) => {
+                if (isSharedView) {
+                    Toast.warning('分享页面暂不支持跳转到引用的详情节点')
+                    return
+                }
+
+                void getDetailNodeLocation(detailNodeId)
+                    .then((locationInfo) => {
+                        if (locationInfo.directoryNodeId === noteDetail?.directoryNodeId) {
+                            const targetNode = flatTree.find(
+                                (node) =>
+                                    node.id === locationInfo.id &&
+                                    node.opStatus !== 'deleted'
+                            )
+                            if (!targetNode) {
+                                Toast.error('引用的详情节点不存在')
+                                return
+                            }
+                            graphViewerRef.current?.centerOn(targetNode.x, targetNode.y)
+                            return
+                        }
+
+                        navigate(`/noteDetails/${locationInfo.directoryNodeId}`, {
+                            state: { focusNodeId: locationInfo.id },
+                        })
+                    })
+                    .catch((error: unknown) => {
+                        Toast.error(
+                            error instanceof Error
+                                ? error.message
+                                : '引用的详情节点加载失败'
+                        )
+                    })
+            },
+            [flatTree, isSharedView, navigate, noteDetail?.directoryNodeId]
+        )
+
         // context
         const paperContext = useMemo(
             () => ({
@@ -573,6 +674,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 setNodeMenuVisible,
                 setChosenParentNodeId,
                 openArticle,
+                openReferencedDetailNode,
             }),
             [
                 graphType,
@@ -584,6 +686,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 selectedNodeId,
                 isChoosingParent,
                 openArticle,
+                openReferencedDetailNode,
             ]
         )
 
@@ -1807,9 +1910,11 @@ const NoteGraph = memo<NoteGraphProps>(
             <PaperContext value={paperContext}>
                 <div className="h-full bg-black">
                     <GraphViewer
+                        ref={graphViewerRef}
                         nodes={flatTree}
                         panFromNodes={browseMode && !editMode}
                         initialViewport={graphInitialView.viewport}
+                        initialCenter={graphInitialView.initialCenter}
                         resetOnMount={graphInitialView.resetOnMount}
                         onViewportChange={setViewport}
                         onViewportCommit={saveActiveViewport}

@@ -37,6 +37,7 @@ export default function NoteNode(node: NodeData) {
     contentType,
     article,
     refDirectoryNodeId,
+    refDetailNodeId,
   } = node;
   const navigate = useNavigate();
 
@@ -55,6 +56,7 @@ export default function NoteNode(node: NodeData) {
   const selectedNodeId = paperContext?.selectedNodeId;
   const setChosenParentNodeId = paperContext?.setChosenParentNodeId;
   const openArticle = paperContext?.openArticle;
+  const openReferencedDetailNode = paperContext?.openReferencedDetailNode;
 
   const gRef = useRef<SVGGElement | null>(null);
   const positionRef = useRef({
@@ -326,6 +328,15 @@ export default function NoteNode(node: NodeData) {
         navigate(`/noteDetails/${refDirectoryNodeId}`, {
           state: { resetView: true },
         });
+        return;
+      }
+
+      if (
+        graphType === "detail" &&
+        (contentType === "REF_DETAIL" || contentType === "REF_ARTICLE") &&
+        typeof refDetailNodeId === "number"
+      ) {
+        openReferencedDetailNode?.(refDetailNodeId);
         return;
       }
 
