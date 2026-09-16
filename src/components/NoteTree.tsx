@@ -1,14 +1,15 @@
-import { useMemo } from "react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import { createLine, findAncestorsByIdInFlatTreeMap } from "../lib";
 import type { NodeData } from "../types";
 import NoteNode from "./NoteNode";
 
 interface NoteTreeProps {
   flatTree: NodeData[];
+  renderNode?: (node: NodeData) => ReactNode;
 }
 
 // support multi-root tree
-const NoteTree = ({ flatTree }: NoteTreeProps) => {
+const NoteTree = ({ flatTree, renderNode }: NoteTreeProps) => {
   const nodesMap = useMemo<Map<number | string, NodeData>>(() => {
     const map = new Map<number | string, NodeData>();
     flatTree.forEach((node) => {
@@ -47,11 +48,10 @@ const NoteTree = ({ flatTree }: NoteTreeProps) => {
     }
 
     if (nodeVisible) {
-      const n = (
-        <NoteNode
-          key={node.id}
-          {...node}
-        />
+      const n = renderNode ? (
+        <Fragment key={node.id}>{renderNode(node)}</Fragment>
+      ) : (
+        <NoteNode key={node.id} {...node} />
       );
       nodes.push(n);
     }

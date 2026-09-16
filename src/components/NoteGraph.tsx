@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import {
     ArrowLeft,
@@ -13,18 +13,16 @@ import {
     KeyRound,
     LoaderCircle,
     LogOut,
-    RotateCcw,
     Search,
     Tags,
     Trash2,
     Upload,
 } from 'lucide-react'
-import { debounce, findDescendantsByIdInFlatTree, getDistanceBetweenTwoPoints } from '../lib'
+import { findDescendantsByIdInFlatTree } from '../lib'
 import { useLocation, useNavigate } from 'react-router'
 import { clearAuthSession } from '../authSession'
 import Button from '../components/Button'
 import NodeMenu, { type NodeMenuExpose } from '../components/NodeMenu'
-import NoteTree from '../components/NoteTree'
 import PaperContext from '../context/paperContext'
 import useModal from '../components/useModal'
 import { Toast } from '../components/Toast'
@@ -74,20 +72,7 @@ import NotificationModal from './NotificationModal'
 import TagManagementModal from './TagManagementModal'
 import DirectoryTags, { NoteTagList } from './DirectoryTags'
 import TagCheckboxGroup from './TagCheckboxGroup'
-
-interface GestureInfo {
-    type: 'none' | 'panning' | 'pinchAndZoom'
-    startX1: number
-    startY1: number
-    startX2: number
-    startY2: number
-    startD: number
-    centerPointX: number
-    centerPointY: number
-    viewportStartX: number
-    viewportStartY: number
-    viewportStartZoom: number
-}
+import GraphViewer, { type GraphViewport, type StoredGraphViewport } from './GraphViewer'
 
 interface NoteGraphProps {
     graphType: 'directory' | 'detail'
@@ -205,11 +190,11 @@ const formatShareTime = (value: string) => {
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('zh-CN')
 }
 
-const loadViewportState = () => {
+const loadViewportState = (): StoredGraphViewport | null => {
     try {
         const stored = localStorage.getItem(VIEWPORT_STORAGE_KEY)
         if (stored) {
-            return JSON.parse(stored)
+            return JSON.parse(stored) as StoredGraphViewport
         }
     } catch {
         // Ignore parse errors
@@ -217,7 +202,7 @@ const loadViewportState = () => {
     return null
 }
 
-const saveViewportState = (viewport: { x: number; y: number; zoom: number }) => {
+const saveViewportState = (viewport: StoredGraphViewport) => {
     try {
         localStorage.setItem(VIEWPORT_STORAGE_KEY, JSON.stringify(viewport))
     } catch {
@@ -225,22 +210,16 @@ const saveViewportState = (viewport: { x: number; y: number; zoom: number }) => 
     }
 }
 
-interface StoredViewport {
-    x: number
-    y: number
-    zoom: number
-}
-
-const loadDetailViewportState = (storageKey: string): StoredViewport | null => {
+const loadDetailViewportState = (storageKey: string): StoredGraphViewport | null => {
     try {
         const stored = sessionStorage.getItem(storageKey)
-        return stored ? (JSON.parse(stored) as StoredViewport) : null
+        return stored ? (JSON.parse(stored) as StoredGraphViewport) : null
     } catch {
         return null
     }
 }
 
-const saveDetailViewportState = (storageKey: string, viewport: StoredViewport) => {
+const saveDetailViewportState = (storageKey: string, viewport: StoredGraphViewport) => {
     try {
         sessionStorage.setItem(storageKey, JSON.stringify(viewport))
     } catch {
@@ -280,7 +259,6 @@ const NoteGraph = memo<NoteGraphProps>(
         const navigate = useNavigate()
         const location = useLocation()
         const isSharedView = viewMode === 'shared'
-        const hasMountedRef = useRef(false)
         const detailHistoryKey =
             graphType === 'detail' && !isSharedView && noteDetail
                 ? `${noteDetail.directoryNodeId}:${location.key}`
@@ -293,33 +271,37 @@ const NoteGraph = memo<NoteGraphProps>(
             : null
         const shouldResetDetailView =
             (location.state as { resetView?: boolean } | null)?.resetView === true
+        const [graphInitialView] = useState<{
+            viewport: StoredGraphViewport | null
+            resetOnMount: boolean
+        }>(() => {
+            const resetWasConsumed = detailResetConsumedKey
+                ? hasConsumedDetailReset(detailResetConsumedKey)
+                : false
+            const resetOnMount =
+                graphType === 'detail' && shouldResetDetailView && !resetWasConsumed
 
-        const [paperSize, setPaperSize] = useState({ width: 0, height: 0 })
-        const [viewport, setViewport] = useState({
+            if (graphType === 'directory') {
+                return { viewport: loadViewportState(), resetOnMount: false }
+            }
+            if (detailViewportStorageKey && !resetOnMount) {
+                return {
+                    viewport: loadDetailViewportState(detailViewportStorageKey),
+                    resetOnMount,
+                }
+            }
+            return { viewport: null, resetOnMount }
+        })
+
+        const [viewport, setViewport] = useState<GraphViewport>({
             x: 0,
             y: 0,
             width: 0,
             height: 0,
             zoom: 1,
         })
-        const viewportRef = useRef(viewport)
-        const paperRef = useRef<SVGSVGElement>(null)
-        const gestureInfo = useRef<GestureInfo>({
-            type: 'none',
-            startX1: 0,
-            startY1: 0,
-            startX2: 0,
-            startY2: 0,
-            startD: 0,
-            centerPointX: 0,
-            centerPointY: 0,
-            viewportStartX: 0,
-            viewportStartY: 0,
-            viewportStartZoom: 1,
-        })
-
         const saveActiveViewport = useCallback(
-            (nextViewport: StoredViewport) => {
+            (nextViewport: StoredGraphViewport) => {
                 if (graphType === 'directory') {
                     saveViewportState(nextViewport)
                 } else if (detailViewportStorageKey) {
@@ -329,14 +311,11 @@ const NoteGraph = memo<NoteGraphProps>(
             [detailViewportStorageKey, graphType]
         )
 
-        // Debounced save for zoom operations (pinch/zoom and wheel)
-        const debouncedSaveViewport = useMemo(
-            () =>
-                debounce<{ x: number; y: number; zoom: number }>(({ x, y, zoom }) => {
-                    saveActiveViewport({ x, y, zoom })
-                }, 300),
-            [saveActiveViewport]
-        )
+        useEffect(() => {
+            if (graphInitialView.resetOnMount && detailResetConsumedKey) {
+                markDetailResetConsumed(detailResetConsumedKey)
+            }
+        }, [detailResetConsumedKey, graphInitialView.resetOnMount])
 
         // const [isAllExpanded, setIsAllExpand] = useState(true);
 
@@ -1099,44 +1078,12 @@ const NoteGraph = memo<NoteGraphProps>(
             onExitEdit()
         }
 
-        const resetView = useCallback(() => {
+        const handleBeforeResetView = useCallback(() => {
             // Clear cached viewport for directory
             if (graphType === 'directory') {
                 localStorage.removeItem(VIEWPORT_STORAGE_KEY)
             }
-
-            const firstRootNode = flatTree.find((node) => node.parentId === null) as NodeData | undefined
-
-            setViewport((prev) => {
-                const nextViewport = firstRootNode
-                    ? {
-                          ...prev,
-                          width: paperSize.width,
-                          height: paperSize.height,
-                          zoom: 1,
-                          x: firstRootNode.x - paperSize.width / 2,
-                          y: firstRootNode.y - paperSize.height / 2,
-                      }
-                    : {
-                          ...prev,
-                          width: paperSize.width,
-                          height: paperSize.height,
-                          zoom: 1,
-                          x: 0,
-                          y: 0,
-                      }
-
-                if (detailViewportStorageKey) {
-                    saveDetailViewportState(detailViewportStorageKey, {
-                        x: nextViewport.x,
-                        y: nextViewport.y,
-                        zoom: nextViewport.zoom,
-                    })
-                }
-
-                return nextViewport
-            })
-        }, [detailViewportStorageKey, flatTree, graphType, paperSize])
+        }, [graphType])
 
         const handleNodeEdit = () => {
             const nodeToEdit = flatTree.find((node) => node.id === selectedNodeId)
@@ -1823,327 +1770,18 @@ const NoteGraph = memo<NoteGraphProps>(
             handleNodeMenuClose()
         }
 
-        useLayoutEffect(() => {
-            viewportRef.current = viewport
-        }, [viewport])
-
-        useLayoutEffect(() => {
-            const updatePaperSize = () => {
-                setPaperSize({ width: window.innerWidth, height: window.innerHeight })
-            }
-
-            const updateViewport = () => {
-                setViewport((prev) => ({
-                    ...prev,
-                    width: window.innerWidth,
-                    height: window.innerHeight,
-                }))
-            }
-
-            window.addEventListener('resize', updatePaperSize)
-            updatePaperSize()
-            updateViewport()
-
-            return () => {
-                window.removeEventListener('resize', updatePaperSize)
-            }
-        }, [])
-
-        // panning and pinch & zoom
-        useEffect(() => {
-            const paperEl = paperRef.current
-            const gestureData = gestureInfo.current
-
-            const onPointerDown = (e: PointerEvent) => {
-                if (editMode && e.target !== paperEl) return
-                if (!browseMode && e.target !== paperEl) return
-
-                // return if it's not left click
-                if (e.pointerType === 'mouse' && e.button !== 0) return
-
-                if (browseMode) {
-                    paperEl?.setPointerCapture(e.pointerId)
-                }
-
-                if (e.isPrimary) {
-                    gestureData.type = 'panning'
-                    gestureData.startX1 = e.clientX
-                    gestureData.startY1 = e.clientY
-                } else {
-                    gestureData.type = 'pinchAndZoom'
-                    gestureData.startX2 = e.clientX
-                    gestureData.startY2 = e.clientY
-
-                    const v = viewportRef.current
-                    const p1 = { x: gestureData.startX1, y: gestureData.startY1 }
-                    const p2 = { x: gestureData.startX2, y: gestureData.startY2 }
-
-                    gestureData.startD = getDistanceBetweenTwoPoints(p1, p2)
-                    gestureData.centerPointX = (p1.x + p2.x) / 2
-                    gestureData.centerPointY = (p1.y + p2.y) / 2
-                    gestureData.viewportStartX = v.x
-                    gestureData.viewportStartY = v.y
-                    gestureData.viewportStartZoom = v.zoom
-                }
-            }
-
-            const onPointerMove = (e: PointerEvent) => {
-                if (gestureData.type === 'panning') {
-                    const deltaX = e.clientX - gestureData.startX1
-                    const deltaY = e.clientY - gestureData.startY1
-
-                    gestureData.startX1 = e.clientX
-                    gestureData.startY1 = e.clientY
-
-                    setViewport((prev) => ({
-                        ...prev,
-                        x: prev.x + -deltaX * prev.zoom,
-                        y: prev.y + -deltaY * prev.zoom,
-                    }))
-                } else if (gestureData.type === 'pinchAndZoom') {
-                    let newD = 0
-                    let p1 = { x: e.clientX, y: e.clientY }
-                    let p2 = { x: e.clientX, y: e.clientY }
-
-                    if (e.isPrimary) {
-                        p2 = { x: gestureData.startX2, y: gestureData.startY2 }
-                        // 更新 gestureData
-                        gestureData.startX1 = e.clientX
-                        gestureData.startY1 = e.clientY
-                    } else {
-                        p1 = { x: gestureData.startX1, y: gestureData.startY1 }
-                        // 更新 gestureData
-                        gestureData.startX2 = e.clientX
-                        gestureData.startY2 = e.clientY
-                    }
-
-                    newD = getDistanceBetweenTwoPoints(p1, p2)
-
-                    let newZoom = gestureData.viewportStartZoom
-
-                    // startD: newD = startZoom: newZoom
-                    const ratio = newD / gestureData.startD
-                    if (ratio !== 1) {
-                        // zoom in or zoom out
-                        newZoom = (1 / ratio) * gestureData.viewportStartZoom
-                    }
-
-                    if (newZoom === 0) return
-
-                    // the position ratio of pointer in the paper
-                    const ratioX = gestureData.centerPointX / paperSize.width
-                    const ratioY = gestureData.centerPointY / paperSize.height
-                    const deltaX =
-                        paperSize.width * -(newZoom - gestureData.viewportStartZoom) * ratioX
-                    const deltaY =
-                        paperSize.height * -(newZoom - gestureData.viewportStartZoom) * ratioY
-
-                    setViewport({
-                        x: gestureData.viewportStartX + deltaX,
-                        y: gestureData.viewportStartY + deltaY,
-                        width: paperSize.width * newZoom,
-                        height: paperSize.height * newZoom,
-                        zoom: newZoom,
-                    })
-                }
-            }
-
-            const onPointerUp = () => {
-                if (gestureData.type === 'panning' || gestureData.type === 'pinchAndZoom') {
-                    const v = viewportRef.current
-                    saveActiveViewport({ x: v.x, y: v.y, zoom: v.zoom })
-                }
-
-                gestureData.type = 'none'
-            }
-
-            const touchHandler = (e: TouchEvent) => {
-                // Allow link clicks - don't prevent default if touching a link
-                const target = e.target as HTMLElement
-                if (target.tagName === 'a' || target.closest('a')) {
-                    return
-                }
-                e.preventDefault()
-            }
-
-            // https://javascript.info/default-browser-action#the-passive-handler-option
-            // The optional passive: true option of addEventListener signals the browser that the handler is not going to call preventDefault().
-            // For some browsers (Firefox, Chrome), passive is true by default for touchstart and touchmove events.
-            // passive: false 使得 e.preventDefault() 能够生效
-            paperEl?.addEventListener('touchstart', touchHandler, {
-                passive: false,
-            })
-            paperEl?.addEventListener('touchmove', touchHandler, {
-                passive: false,
-            })
-
-            paperEl?.addEventListener('pointerdown', onPointerDown)
-            paperEl?.addEventListener('pointermove', onPointerMove)
-            paperEl?.addEventListener('pointerup', onPointerUp)
-
-            return () => {
-                paperEl?.removeEventListener('touchstart', touchHandler)
-                paperEl?.removeEventListener('touchmove', touchHandler)
-
-                paperEl?.removeEventListener('pointerdown', onPointerDown)
-                paperEl?.removeEventListener('pointermove', onPointerMove)
-                paperEl?.removeEventListener('pointerup', onPointerUp)
-            }
-        }, [paperSize, editMode, browseMode, saveActiveViewport])
-
-        // zooming
-        useEffect(() => {
-            const paperEl = paperRef.current
-
-            const onWheel = (e: WheelEvent) => {
-                // console.log(e);
-
-                setViewport((prev) => {
-                    const zoom = prev.zoom
-                    let newZoom = prev.zoom
-
-                    if (e.deltaY < 0) {
-                        // up -> zoom in
-                        newZoom /= 1.1
-                    } else if (e.deltaY > 0) {
-                        // down -> zoom out
-                        newZoom *= 1.1
-                    }
-
-                    // console.log(newZoom)
-
-                    // the position ratio of pointer in the paper
-                    const ratioX = e.clientX / paperSize.width
-                    const ratioY = e.clientY / paperSize.height
-                    const deltaX = paperSize.width * -(newZoom - zoom) * ratioX
-                    const deltaY = paperSize.height * -(newZoom - zoom) * ratioY
-
-                    const newX = prev.x + deltaX
-                    const newY = prev.y + deltaY
-
-                    debouncedSaveViewport({
-                        x: newX,
-                        y: newY,
-                        zoom: newZoom,
-                    })
-
-                    return {
-                        x: newX,
-                        y: newY,
-                        width: paperSize.width * newZoom,
-                        height: paperSize.height * newZoom,
-                        zoom: newZoom,
-                    }
-                })
-            }
-
-            paperEl?.addEventListener('wheel', onWheel)
-
-            return () => {
-                paperEl?.removeEventListener('wheel', onWheel)
-            }
-        }, [paperSize, debouncedSaveViewport])
-
-        // init viewport
-        useEffect(() => {
-            if (hasMountedRef.current) return
-
-            if (graphType === 'detail' && viewport.width > 0 && viewport.height > 0) {
-                hasMountedRef.current = true
-
-                const resetWasConsumed = detailResetConsumedKey
-                    ? hasConsumedDetailReset(detailResetConsumedKey)
-                    : false
-                const savedViewport = detailViewportStorageKey
-                    ? loadDetailViewportState(detailViewportStorageKey)
-                    : null
-
-                if (!shouldResetDetailView || resetWasConsumed) {
-                    if (savedViewport) {
-                        setViewport((prev) => ({
-                            ...prev,
-                            x: savedViewport.x,
-                            y: savedViewport.y,
-                            zoom: savedViewport.zoom,
-                            width: paperSize.width * savedViewport.zoom,
-                            height: paperSize.height * savedViewport.zoom,
-                        }))
-                        return
-                    }
-                }
-
-                resetView()
-                if (shouldResetDetailView && detailResetConsumedKey) {
-                    markDetailResetConsumed(detailResetConsumedKey)
-                }
-                return
-            }
-
-            if (flatTree.length > 0 && viewport.width > 0 && viewport.height > 0) {
-                hasMountedRef.current = true
-
-                if (graphType === 'directory') {
-                    const cached = loadViewportState()
-                    if (
-                        cached &&
-                        cached.x !== undefined &&
-                        cached.y !== undefined &&
-                        cached.zoom !== undefined
-                    ) {
-                        setViewport((prev) => ({
-                            ...prev,
-                            x: cached.x,
-                            y: cached.y,
-                            zoom: cached.zoom,
-                            width: paperSize.width * cached.zoom,
-                            height: paperSize.height * cached.zoom,
-                        }))
-                        return
-                    }
-                }
-
-                resetView()
-            }
-        }, [
-            detailResetConsumedKey,
-            detailViewportStorageKey,
-            flatTree,
-            graphType,
-            paperSize,
-            resetView,
-            shouldResetDetailView,
-            viewport.height,
-            viewport.width,
-        ])
-
-        useEffect(() => {
-            return () => {
-                if (!detailViewportStorageKey || !hasMountedRef.current) return
-
-                const currentViewport = viewportRef.current
-                saveDetailViewportState(detailViewportStorageKey, {
-                    x: currentViewport.x,
-                    y: currentViewport.y,
-                    zoom: currentViewport.zoom,
-                })
-            }
-        }, [detailViewportStorageKey])
-
         return (
             <PaperContext value={paperContext}>
                 <div className="h-full bg-black">
-                    <svg
-                        ref={paperRef}
-                        data-testid="note-graph"
-                        width={paperSize.width}
-                        height={paperSize.height}
-                        // ⭐ viewBox 会先应用 x 和 y，然后才应用 width 和 height
-                        // viewBox 的效果：以 (x, y) 为左上角，显示 width × height 区域，并投影到 svg 画布上
-                        viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
-                        onContextMenu={(e) => e.preventDefault()}
-                    >
-                        <NoteTree flatTree={flatTree} />
-                    </svg>
+                    <GraphViewer
+                        nodes={flatTree}
+                        panFromNodes={browseMode && !editMode}
+                        initialViewport={graphInitialView.viewport}
+                        resetOnMount={graphInitialView.resetOnMount}
+                        onViewportChange={setViewport}
+                        onViewportCommit={saveActiveViewport}
+                        onResetView={handleBeforeResetView}
+                    />
                     {noteTitle && (
                         <div
                             className={`fixed flex items-center gap-2 select-none ${
@@ -2255,18 +1893,6 @@ const NoteGraph = memo<NoteGraphProps>(
                             </button>
                         </div>
                     )}
-
-                    <div className="fixed top-4 right-4 select-none">
-                        <button
-                            type="button"
-                            onClick={resetView}
-                            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
-                            title="重置视图"
-                            aria-label="重置视图"
-                        >
-                            <RotateCcw className="h-5 w-5" />
-                        </button>
-                    </div>
 
                     {!isChoosingParent && chosenParentNodeId === null && (
                         <div className="fixed top-25 right-0 w-36">

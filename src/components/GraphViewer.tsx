@@ -1,0 +1,419 @@
+import {
+    forwardRef,
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react'
+import { RotateCcw } from 'lucide-react'
+
+import { getDistanceBetweenTwoPoints } from '../lib'
+import type { NodeData } from '../types'
+import NoteTree from './NoteTree'
+
+export interface StoredGraphViewport {
+    x: number
+    y: number
+    zoom: number
+}
+
+export interface GraphViewport extends StoredGraphViewport {
+    width: number
+    height: number
+}
+
+export interface GraphViewerHandle {
+    resetView: () => void
+    getViewport: () => GraphViewport
+}
+
+interface GraphViewerProps {
+    nodes: NodeData[]
+    panFromNodes?: boolean
+    initialViewport?: StoredGraphViewport | null
+    resetOnMount?: boolean
+    showResetView?: boolean
+    renderNode?: (node: NodeData) => ReactNode
+    onViewportChange?: (viewport: GraphViewport) => void
+    onViewportCommit?: (viewport: StoredGraphViewport) => void
+    onResetView?: () => void
+}
+
+interface GestureInfo {
+    type: 'none' | 'panning' | 'pinchAndZoom'
+    startX1: number
+    startY1: number
+    startX2: number
+    startY2: number
+    startD: number
+    centerPointX: number
+    centerPointY: number
+    viewportStartX: number
+    viewportStartY: number
+    viewportStartZoom: number
+}
+
+const toStoredViewport = (viewport: GraphViewport): StoredGraphViewport => ({
+    x: viewport.x,
+    y: viewport.y,
+    zoom: viewport.zoom,
+})
+
+const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function GraphViewer(
+    {
+        nodes,
+        panFromNodes = false,
+        initialViewport = null,
+        resetOnMount = false,
+        showResetView = true,
+        renderNode,
+        onViewportChange,
+        onViewportCommit,
+        onResetView,
+    },
+    ref
+) {
+    const [paperSize, setPaperSize] = useState({ width: 0, height: 0 })
+    const [viewport, setViewport] = useState<GraphViewport>({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        zoom: 1,
+    })
+    const viewportRef = useRef(viewport)
+    const paperRef = useRef<SVGSVGElement>(null)
+    const hasInitializedRef = useRef(false)
+    const hasAppliedInitialViewportRef = useRef(false)
+    const wheelCommitTimerRef = useRef<number | null>(null)
+    const onViewportCommitRef = useRef(onViewportCommit)
+    const gestureInfo = useRef<GestureInfo>({
+        type: 'none',
+        startX1: 0,
+        startY1: 0,
+        startX2: 0,
+        startY2: 0,
+        startD: 0,
+        centerPointX: 0,
+        centerPointY: 0,
+        viewportStartX: 0,
+        viewportStartY: 0,
+        viewportStartZoom: 1,
+    })
+
+    useLayoutEffect(() => {
+        viewportRef.current = viewport
+        onViewportChange?.(viewport)
+    }, [onViewportChange, viewport])
+
+    useLayoutEffect(() => {
+        onViewportCommitRef.current = onViewportCommit
+    }, [onViewportCommit])
+
+    const commitViewport = useCallback((nextViewport: StoredGraphViewport) => {
+        onViewportCommitRef.current?.(nextViewport)
+    }, [])
+
+    const resetView = useCallback(() => {
+        const firstRootNode = nodes.find((node) => node.parentId === null)
+        const nextViewport: GraphViewport = firstRootNode
+            ? {
+                  width: paperSize.width,
+                  height: paperSize.height,
+                  zoom: 1,
+                  x: firstRootNode.x - paperSize.width / 2,
+                  y: firstRootNode.y - paperSize.height / 2,
+              }
+            : {
+                  width: paperSize.width,
+                  height: paperSize.height,
+                  zoom: 1,
+                  x: 0,
+                  y: 0,
+              }
+
+        setViewport(nextViewport)
+        commitViewport(toStoredViewport(nextViewport))
+    }, [commitViewport, nodes, paperSize])
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            resetView,
+            getViewport: () => viewportRef.current,
+        }),
+        [resetView]
+    )
+
+    // Debounced save for zoom operations (pinch/zoom and wheel)
+    const scheduleViewportCommit = useCallback(
+        (nextViewport: StoredGraphViewport) => {
+            if (wheelCommitTimerRef.current !== null) {
+                window.clearTimeout(wheelCommitTimerRef.current)
+            }
+            wheelCommitTimerRef.current = window.setTimeout(() => {
+                wheelCommitTimerRef.current = null
+                commitViewport(nextViewport)
+            }, 300)
+        },
+        [commitViewport]
+    )
+
+    useLayoutEffect(() => {
+        const updateSize = () => {
+            const width = window.innerWidth
+            const height = window.innerHeight
+            setPaperSize({ width, height })
+            setViewport((previous) => ({
+                ...previous,
+                width,
+                height,
+            }))
+        }
+
+        window.addEventListener('resize', updateSize)
+        updateSize()
+
+        return () => window.removeEventListener('resize', updateSize)
+    }, [])
+
+    // init viewport
+    useEffect(() => {
+        if (hasInitializedRef.current || paperSize.width <= 0 || paperSize.height <= 0) return
+        if (nodes.length === 0) return
+
+        hasInitializedRef.current = true
+        let didApplyViewport = false
+        const timer = window.setTimeout(() => {
+            didApplyViewport = true
+            hasAppliedInitialViewportRef.current = true
+            if (!resetOnMount && initialViewport) {
+                setViewport({
+                    x: initialViewport.x,
+                    y: initialViewport.y,
+                    zoom: initialViewport.zoom,
+                    width: paperSize.width * initialViewport.zoom,
+                    height: paperSize.height * initialViewport.zoom,
+                })
+                return
+            }
+
+            resetView()
+        }, 0)
+
+        return () => {
+            window.clearTimeout(timer)
+            if (!didApplyViewport) hasInitializedRef.current = false
+        }
+    }, [initialViewport, nodes.length, paperSize, resetOnMount, resetView])
+
+    // panning and pinch & zoom
+    useEffect(() => {
+        const paperElement = paperRef.current
+        const gesture = gestureInfo.current
+
+        const onPointerDown = (event: PointerEvent) => {
+            if (!panFromNodes && event.target !== paperElement) return
+
+            // return if it's not left click
+            if (event.pointerType === 'mouse' && event.button !== 0) return
+
+            if (panFromNodes) paperElement?.setPointerCapture(event.pointerId)
+
+            if (event.isPrimary) {
+                gesture.type = 'panning'
+                gesture.startX1 = event.clientX
+                gesture.startY1 = event.clientY
+                return
+            }
+
+            gesture.type = 'pinchAndZoom'
+            gesture.startX2 = event.clientX
+            gesture.startY2 = event.clientY
+
+            const currentViewport = viewportRef.current
+            const firstPointer = { x: gesture.startX1, y: gesture.startY1 }
+            const secondPointer = { x: gesture.startX2, y: gesture.startY2 }
+            gesture.startD = getDistanceBetweenTwoPoints(firstPointer, secondPointer)
+            gesture.centerPointX = (firstPointer.x + secondPointer.x) / 2
+            gesture.centerPointY = (firstPointer.y + secondPointer.y) / 2
+            gesture.viewportStartX = currentViewport.x
+            gesture.viewportStartY = currentViewport.y
+            gesture.viewportStartZoom = currentViewport.zoom
+        }
+
+        const onPointerMove = (event: PointerEvent) => {
+            if (gesture.type === 'panning') {
+                const deltaX = event.clientX - gesture.startX1
+                const deltaY = event.clientY - gesture.startY1
+                gesture.startX1 = event.clientX
+                gesture.startY1 = event.clientY
+
+                setViewport((previous) => ({
+                    ...previous,
+                    x: previous.x - deltaX * previous.zoom,
+                    y: previous.y - deltaY * previous.zoom,
+                }))
+                return
+            }
+
+            if (gesture.type !== 'pinchAndZoom') return
+
+            let firstPointer = { x: event.clientX, y: event.clientY }
+            let secondPointer = { x: event.clientX, y: event.clientY }
+            if (event.isPrimary) {
+                secondPointer = { x: gesture.startX2, y: gesture.startY2 }
+                // 更新 gestureData
+                gesture.startX1 = event.clientX
+                gesture.startY1 = event.clientY
+            } else {
+                firstPointer = { x: gesture.startX1, y: gesture.startY1 }
+                // 更新 gestureData
+                gesture.startX2 = event.clientX
+                gesture.startY2 = event.clientY
+            }
+
+            const distance = getDistanceBetweenTwoPoints(firstPointer, secondPointer)
+
+            // startD: newD = startZoom: newZoom
+            const ratio = distance / gesture.startD
+            // zoom in or zoom out
+            const nextZoom = ratio === 1 ? gesture.viewportStartZoom : gesture.viewportStartZoom / ratio
+            if (!Number.isFinite(nextZoom) || nextZoom === 0) return
+
+            // the position ratio of pointer in the paper
+            const ratioX = gesture.centerPointX / paperSize.width
+            const ratioY = gesture.centerPointY / paperSize.height
+            const deltaX = paperSize.width * -(nextZoom - gesture.viewportStartZoom) * ratioX
+            const deltaY = paperSize.height * -(nextZoom - gesture.viewportStartZoom) * ratioY
+
+            setViewport({
+                x: gesture.viewportStartX + deltaX,
+                y: gesture.viewportStartY + deltaY,
+                width: paperSize.width * nextZoom,
+                height: paperSize.height * nextZoom,
+                zoom: nextZoom,
+            })
+        }
+
+        const onPointerUp = () => {
+            if (gesture.type === 'panning' || gesture.type === 'pinchAndZoom') {
+                commitViewport(toStoredViewport(viewportRef.current))
+            }
+            gesture.type = 'none'
+        }
+
+        const preventTouchScroll = (event: TouchEvent) => {
+            // Allow link clicks - don't prevent default if touching a link
+            const target = event.target as HTMLElement
+            if (target.tagName === 'a' || target.closest('a')) return
+            event.preventDefault()
+        }
+
+        // https://javascript.info/default-browser-action#the-passive-handler-option
+        // The optional passive: true option of addEventListener signals the browser that the handler is not going to call preventDefault().
+        // For some browsers (Firefox, Chrome), passive is true by default for touchstart and touchmove events.
+        // passive: false 使得 e.preventDefault() 能够生效
+        paperElement?.addEventListener('touchstart', preventTouchScroll, { passive: false })
+        paperElement?.addEventListener('touchmove', preventTouchScroll, { passive: false })
+        paperElement?.addEventListener('pointerdown', onPointerDown)
+        paperElement?.addEventListener('pointermove', onPointerMove)
+        paperElement?.addEventListener('pointerup', onPointerUp)
+
+        return () => {
+            paperElement?.removeEventListener('touchstart', preventTouchScroll)
+            paperElement?.removeEventListener('touchmove', preventTouchScroll)
+            paperElement?.removeEventListener('pointerdown', onPointerDown)
+            paperElement?.removeEventListener('pointermove', onPointerMove)
+            paperElement?.removeEventListener('pointerup', onPointerUp)
+        }
+    }, [commitViewport, panFromNodes, paperSize])
+
+    // zooming
+    useEffect(() => {
+        const paperElement = paperRef.current
+
+        const onWheel = (event: WheelEvent) => {
+            // console.log(e);
+            setViewport((previous) => {
+                let nextZoom = previous.zoom
+                if (event.deltaY < 0) {
+                    // up -> zoom in
+                    nextZoom /= 1.1
+                } else if (event.deltaY > 0) {
+                    // down -> zoom out
+                    nextZoom *= 1.1
+                }
+
+                // console.log(newZoom)
+
+                // the position ratio of pointer in the paper
+                const ratioX = event.clientX / paperSize.width
+                const ratioY = event.clientY / paperSize.height
+                const deltaX = paperSize.width * -(nextZoom - previous.zoom) * ratioX
+                const deltaY = paperSize.height * -(nextZoom - previous.zoom) * ratioY
+                const nextViewport = {
+                    x: previous.x + deltaX,
+                    y: previous.y + deltaY,
+                    width: paperSize.width * nextZoom,
+                    height: paperSize.height * nextZoom,
+                    zoom: nextZoom,
+                }
+
+                scheduleViewportCommit(toStoredViewport(nextViewport))
+                return nextViewport
+            })
+        }
+
+        paperElement?.addEventListener('wheel', onWheel)
+        return () => paperElement?.removeEventListener('wheel', onWheel)
+    }, [paperSize, scheduleViewportCommit])
+
+    useEffect(() => {
+        return () => {
+            if (wheelCommitTimerRef.current !== null) {
+                window.clearTimeout(wheelCommitTimerRef.current)
+            }
+            if (!hasAppliedInitialViewportRef.current) return
+            commitViewport(toStoredViewport(viewportRef.current))
+        }
+    }, [commitViewport])
+
+    return (
+        <>
+            <svg
+                ref={paperRef}
+                data-testid="note-graph"
+                width={paperSize.width}
+                height={paperSize.height}
+                // ⭐ viewBox 会先应用 x 和 y，然后才应用 width 和 height
+                // viewBox 的效果：以 (x, y) 为左上角，显示 width × height 区域，并投影到 svg 画布上
+                viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`}
+                onContextMenu={(event) => event.preventDefault()}
+            >
+                <NoteTree flatTree={nodes} renderNode={renderNode} />
+            </svg>
+            {showResetView && (
+                <div className="fixed top-4 right-4 select-none">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onResetView?.()
+                            resetView()
+                        }}
+                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                        title="重置视图"
+                        aria-label="重置视图"
+                    >
+                        <RotateCcw className="h-5 w-5" />
+                    </button>
+                </div>
+            )}
+        </>
+    )
+})
+
+export default GraphViewer
