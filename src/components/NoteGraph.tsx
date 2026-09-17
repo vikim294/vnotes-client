@@ -726,6 +726,30 @@ const NoteGraph = memo<NoteGraphProps>(
             })
         }
 
+        const handleArticleTextareaKeyDown = (
+            event: React.KeyboardEvent<HTMLTextAreaElement>
+        ) => {
+            if (event.key !== 'Tab') return
+
+            event.preventDefault()
+            const textarea = event.currentTarget
+            const edit = editTextareaIndentation(
+                textarea.value,
+                textarea.selectionStart,
+                textarea.selectionEnd,
+                event.shiftKey
+            )
+
+            if (edit.value === textarea.value) return
+
+            setArticleContent(edit.value)
+            window.requestAnimationFrame(() => {
+                if (textarea.isConnected) {
+                    textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd)
+                }
+            })
+        }
+
         const loadTagSelection = async (
             directoryNodeId?: number,
             fallbackSelectedTagIds: number[] = []
@@ -2791,16 +2815,18 @@ const NoteGraph = memo<NoteGraphProps>(
                                         正文
                                     </span>
                                     <textarea
-                                        className="bg-textarea min-h-96 w-full resize-y rounded-lg border border-slate-700 p-4 leading-7 text-slate-100 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                        className="bg-textarea min-h-96 w-full resize-y overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700 p-4 leading-7 text-slate-100 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                        wrap="off"
                                         value={articleContent}
                                         onChange={(event) => setArticleContent(event.target.value)}
+                                        onKeyDown={handleArticleTextareaKeyDown}
                                         disabled={isArticleSaving}
                                         placeholder="开始编写文章内容..."
                                         spellCheck={false}
                                     />
                                 </label>
                             ) : article ? (
-                                <article className="min-h-96 whitespace-pre-wrap break-words rounded-lg border border-slate-700 bg-slate-950/60 p-5 leading-7 text-slate-200">
+                                <article className="min-h-96 overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700 bg-slate-950/60 p-5 leading-7 text-slate-200">
                                     {article.content || (
                                         <span className="text-slate-500">暂无文章内容</span>
                                     )}
