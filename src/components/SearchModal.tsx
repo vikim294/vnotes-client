@@ -4,6 +4,7 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    Clock3,
     FileText,
     Folder,
     LoaderCircle,
@@ -15,9 +16,11 @@ import {
     X,
 } from 'lucide-react'
 import {
+    getNoteSearchHistory,
     getTags,
     searchDirectoryNodes,
     type Note,
+    type NoteSearchHistory,
     type PageResponse,
     type Tag,
 } from '../api'
@@ -68,7 +71,8 @@ export default function SearchModal({
     excludeNoteId,
 }: SearchModalProps) {
     const [query, setQuery] = useState('')
-    const [debouncedQuery, setDebouncedQuery] = useState('')
+    const [submittedQuery, setSubmittedQuery] = useState('')
+    const [searchRequestKey, setSearchRequestKey] = useState(0)
     const [nodeType, setNodeType] = useState<NodeType | ''>(
         mode === 'select' ? 'DETAIL' : ''
     )
@@ -83,13 +87,46 @@ export default function SearchModal({
     const [result, setResult] = useState<PageResponse<Note>>(EMPTY_PAGE)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [searchHistory, setSearchHistory] = useState<NoteSearchHistory[]>([])
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false)
+    const [historyError, setHistoryError] = useState<string | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         if (!isOpen) return
-        const timer = window.setTimeout(() => setDebouncedQuery(query), 250)
-        return () => window.clearTimeout(timer)
-    }, [isOpen, query])
+
+        const controller = new AbortController()
+        const timer = window.setTimeout(() => {
+            setIsHistoryLoading(true)
+            setHistoryError(null)
+
+            void getNoteSearchHistory(controller.signal)
+                .then(setSearchHistory)
+                .catch((requestError: unknown) => {
+                    if (
+                        requestError instanceof DOMException &&
+                        requestError.name === 'AbortError'
+                    ) {
+                        return
+                    }
+
+                    setSearchHistory([])
+                    setHistoryError(
+                        requestError instanceof Error
+                            ? requestError.message
+                            : '搜索历史加载失败'
+                    )
+                })
+                .finally(() => {
+                    if (!controller.signal.aborted) setIsHistoryLoading(false)
+                })
+        }, 0)
+
+        return () => {
+            window.clearTimeout(timer)
+            controller.abort()
+        }
+    }, [isOpen])
 
     useEffect(() => {
         if (!isOpen) return
@@ -137,7 +174,7 @@ export default function SearchModal({
 
             void searchDirectoryNodes(
                 {
-                    keyword: debouncedQuery,
+                    keyword: submittedQuery,
                     nodeType: mode === 'select' ? 'DETAIL' : nodeType || undefined,
                     tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
                     startTime: startDate ? `${startDate}T00:00:00` : undefined,
@@ -167,7 +204,7 @@ export default function SearchModal({
             window.clearTimeout(timer)
             controller.abort()
         }
-    }, [debouncedQuery, endDate, isOpen, mode, nodeType, page, selectedTagIds, startDate])
+    }, [endDate, isOpen, mode, nodeType, page, searchRequestKey, selectedTagIds, startDate, submittedQuery])
 
     useEffect(() => {
         if (!isOpen) return
@@ -202,7 +239,7 @@ export default function SearchModal({
 
     const handleClose = () => {
         setQuery('')
-        setDebouncedQuery('')
+        setSubmittedQuery('')
         setNodeType(mode === 'select' ? 'DETAIL' : '')
         setSelectedTagIds([])
         setStartDate('')
@@ -210,7 +247,15 @@ export default function SearchModal({
         setPage(1)
         setResult(EMPTY_PAGE)
         setError(null)
+        setSearchHistory([])
+        setHistoryError(null)
         onClose()
+    }
+
+    const handleSearch = () => {
+        setSubmittedQuery(query.trim())
+        setPage(1)
+        setSearchRequestKey((current) => current + 1)
     }
 
     const handleSelectNote = (note: Note) => {
@@ -260,7 +305,13 @@ export default function SearchModal({
                             </button>
                         </div>
 
-                        <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-600/80 bg-slate-950/55 px-4 shadow-inner transition-colors focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15">
+                        <form
+                            className="flex h-12 items-center gap-3 rounded-xl border border-slate-600/80 bg-slate-950/55 pl-4 pr-1.5 shadow-inner transition-colors focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/15"
+                            onSubmit={(event) => {
+                                event.preventDefault()
+                                handleSearch()
+                            }}
+                        >
                             <Search className="h-5 w-5 shrink-0 text-indigo-400" />
                             <input
                                 ref={inputRef}
@@ -293,7 +344,54 @@ export default function SearchModal({
                                     <X className="h-3.5 w-3.5" />
                                 </button>
                             )}
-                        </div>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="h-9 shrink-0 cursor-pointer rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                搜索
+                            </button>
+                        </form>
+
+                        {(isHistoryLoading || historyError || searchHistory.length > 0) && (
+                            <div className="mt-3 flex items-start gap-2">
+                                <span className="flex h-7 shrink-0 items-center gap-1.5 text-xs text-slate-500">
+                                    <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                                    搜索历史
+                                </span>
+                                {isHistoryLoading ? (
+                                    <span className="flex h-7 items-center text-xs text-slate-500">
+                                        <LoaderCircle
+                                            className="mr-1.5 h-3.5 w-3.5 animate-spin"
+                                            aria-hidden="true"
+                                        />
+                                        加载中
+                                    </span>
+                                ) : historyError ? (
+                                    <span className="flex h-7 items-center text-xs text-rose-400">
+                                        {historyError}
+                                    </span>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        {searchHistory.map((history) => (
+                                            <button
+                                                key={history.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setQuery(history.keyword)
+                                                    resetPage()
+                                                    inputRef.current?.focus()
+                                                }}
+                                                title={history.keyword}
+                                                className="max-w-48 cursor-pointer truncate rounded-md border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs text-slate-300 transition-colors hover:border-indigo-500/60 hover:bg-indigo-500/10 hover:text-indigo-200"
+                                            >
+                                                {history.keyword}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-slate-900/45 px-5 py-4">

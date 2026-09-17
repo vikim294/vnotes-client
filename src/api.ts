@@ -72,6 +72,11 @@ export interface DirectorySearchParams {
     pageSize: number
 }
 
+export interface NoteSearchHistory {
+    id: number
+    keyword: string
+}
+
 export interface PageResponse<T> {
     list: T[]
     page: number
@@ -275,6 +280,19 @@ export async function searchDirectoryNodes(
     }
 
     return res.data as PageResponse<Note>
+}
+
+export async function getNoteSearchHistory(
+    signal?: AbortSignal
+): Promise<NoteSearchHistory[]> {
+    const response = await authFetch(`${API_BASE_URL}/note/search-history`, { signal })
+    const res = (await response.json()) as ApiResponse<NoteSearchHistory[]>
+
+    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+        throw new Error(res.message || '搜索历史加载失败')
+    }
+
+    return res.data
 }
 
 export async function searchTrashBinNodes(
