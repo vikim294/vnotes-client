@@ -296,6 +296,7 @@ export default function NoteNode(node: NodeData) {
       resizeRef.current.isResizing = false;
       resizeHandle.removeEventListener("pointermove", handleResizeMove);
       resizeHandle.removeEventListener("pointerup", handleResizeEnd);
+      resizeHandle.removeEventListener("lostpointercapture", handleLostPointerCapture);
 
       // Update flatTree with new dimensions
       if (setFlatTree && flatTree) {
@@ -314,8 +315,14 @@ export default function NoteNode(node: NodeData) {
       }
     };
 
+    // ⭐️ handle 失去鼠标捕获时，更新 isResizing 为 false
+    const handleLostPointerCapture = () => {
+      resizeRef.current.isResizing = false;
+    }
+
     resizeHandle.addEventListener("pointermove", handleResizeMove);
     resizeHandle.addEventListener("pointerup", handleResizeEnd);
+    resizeHandle.addEventListener("lostpointercapture", handleLostPointerCapture);
   };
 
   const handleDoubleClick = () => {
