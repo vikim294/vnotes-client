@@ -299,11 +299,18 @@ export default function NoteNode(node: NodeData) {
       resizeRef.current.currentHeight = newHeight;
     };
 
-    const handleResizeEnd = () => {
-      resizeRef.current.isResizing = false;
+    function removeResizeListeners() {
       resizeHandle.removeEventListener("pointermove", handleResizeMove);
       resizeHandle.removeEventListener("pointerup", handleResizeEnd);
+      resizeHandle.removeEventListener("pointercancel", handleResizeCancel);
       resizeHandle.removeEventListener("lostpointercapture", handleLostPointerCapture);
+    }
+
+    function finishResize() {
+      if (!resizeRef.current.isResizing) return;
+
+      resizeRef.current.isResizing = false;
+      removeResizeListeners();
 
       // Update flatTree with new dimensions
       if (setFlatTree && flatTree) {
@@ -320,15 +327,24 @@ export default function NoteNode(node: NodeData) {
           ),
         );
       }
-    };
+    }
 
-    // ⭐️ handle 失去鼠标捕获时，更新 isResizing 为 false
-    const handleLostPointerCapture = () => {
-      resizeRef.current.isResizing = false;
+    function handleResizeEnd() {
+      finishResize();
+    }
+
+    function handleResizeCancel() {
+      finishResize();
+    }
+
+    // ⭐️ handle 失去鼠标捕获时，也要完成本次 resize
+    function handleLostPointerCapture() {
+      finishResize();
     }
 
     resizeHandle.addEventListener("pointermove", handleResizeMove);
     resizeHandle.addEventListener("pointerup", handleResizeEnd);
+    resizeHandle.addEventListener("pointercancel", handleResizeCancel);
     resizeHandle.addEventListener("lostpointercapture", handleLostPointerCapture);
   };
 
