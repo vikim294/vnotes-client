@@ -7,6 +7,7 @@ const PaperContext = createContext<{
   browseMode: boolean;
   flatTree: NodeData[];
   editMode: boolean;
+  isSaving: boolean;
   viewportZoom: number;
   selectedNodeId: number | string | null;
   nodeMenuRef: React.RefObject<NodeMenuExpose | null>;

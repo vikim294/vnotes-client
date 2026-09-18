@@ -14,6 +14,8 @@ import type { Size } from "../types/note";
 import { Toast } from "../components/Toast";
 import NoteNodeView, { NODE_PADDING_X } from "./NoteNodeView";
 
+const MIN_IMAGE_SHORT_SIDE = 50;
+
 const createNodeMenuEvent = (detail: {
   nodeId: number | string;
   source: "longtap" | "contextmenu";
@@ -47,6 +49,7 @@ export default function NoteNode(node: NodeData) {
   const browseMode = paperContext?.browseMode;
   const flatTree = paperContext?.flatTree;
   const editMode = paperContext?.editMode;
+  const isSaving = paperContext?.isSaving;
   const viewportZoom = paperContext?.viewportZoom;
   const setSelectedNodeId = paperContext?.setSelectedNodeId;
   const nodeMenuRef = paperContext?.nodeMenuRef;
@@ -240,7 +243,7 @@ export default function NoteNode(node: NodeData) {
     // why doesn't work? (<g>'s onPointerDown will trigger first...)
     // because of the React's synthetic event system
     e.stopPropagation();
-    if (!editMode) return;
+    if (!editMode || isSaving) return;
 
     const resizeHandle = e.currentTarget;
     const displayWidth = nodeSize.width - NODE_PADDING_X;
@@ -257,9 +260,13 @@ export default function NoteNode(node: NodeData) {
     resizeRef.current.currentHeight = displayHeight;
 
     const aspectRatio =
-      resizeRef.current.startHeight > 0
+      resizeRef.current.startWidth > 0 && resizeRef.current.startHeight > 0
         ? resizeRef.current.startWidth / resizeRef.current.startHeight
         : 1;
+    const minWidth =
+      aspectRatio >= 1
+        ? MIN_IMAGE_SHORT_SIDE * aspectRatio
+        : MIN_IMAGE_SHORT_SIDE;
 
     const handleResizeMove = (moveEvent: PointerEvent) => {
       if (!resizeRef.current.isResizing) return;
@@ -275,11 +282,11 @@ export default function NoteNode(node: NodeData) {
         Math.sqrt(deltaX * deltaX + deltaY * deltaY) *
         Math.sign(deltaX + deltaY);
 
-      const newWidth = Math.max(50, resizeRef.current.startWidth + delta);
-      const newHeight = Math.max(
-        50,
-        resizeRef.current.startHeight + delta / aspectRatio,
+      const newWidth = Math.max(
+        minWidth,
+        resizeRef.current.startWidth + delta,
       );
+      const newHeight = newWidth / aspectRatio;
 
       // Update local size for immediate feedback
       setNodeSize({
@@ -531,7 +538,7 @@ export default function NoteNode(node: NodeData) {
         size={nodeSize}
         onSizeChange={setNodeSize}
       />
-      {contentType === "IMAGE" && editMode && (
+      {contentType === "IMAGE" && editMode && !isSaving && (
         <rect
           data-el-type={"resize-handle"}
           x={
