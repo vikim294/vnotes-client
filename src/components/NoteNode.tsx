@@ -1,5 +1,6 @@
 import {
   use,
+  useCallback,
   useEffect,
   // useMemo,
   useRef,
@@ -102,6 +103,57 @@ export default function NoteNode(node: NodeData) {
     width: 0,
     height: 0,
   });
+  const textMeasurementRef = useRef<{
+    label: string;
+    size: Size;
+  } | null>(null);
+
+  const handleNodeSizeChange = useCallback(
+    (nextSize: Size) => {
+      setNodeSize(nextSize);
+
+      if (contentType === "IMAGE") return;
+
+      const previousMeasurement = textMeasurementRef.current;
+      textMeasurementRef.current = {
+        label: node.label,
+        size: nextSize,
+      };
+
+      // 首次渲染只记录尺寸；只在编辑状态下的文本变更后修正位置。
+      if (
+        !previousMeasurement ||
+        previousMeasurement.label === node.label ||
+        !editMode
+      ) {
+        return;
+      }
+
+      const widthDelta = nextSize.width - previousMeasurement.size.width;
+      if (Math.abs(widthDelta) < 0.01 || !setFlatTree) return;
+
+      setFlatTree((prev) => {
+        const descendantIds = new Set(
+          findDescendantsByIdInFlatTree(prev, id).map((item) => item.id),
+        );
+
+        return prev.map((item) => {
+          if (item.id !== id && !descendantIds.has(item.id)) return item;
+
+          // 编辑节点移动宽度变化量的一半以固定左边缘；
+          // 后代节点移动完整变化量，以保持与编辑节点右边缘的原有距离。
+          const deltaX = item.id === id ? widthDelta / 2 : widthDelta;
+
+          return {
+            ...item,
+            x: item.x + deltaX,
+            opStatus: item.opStatus ?? "edited",
+          };
+        });
+      });
+    },
+    [contentType, editMode, id, node.label, setFlatTree],
+  );
 
   const showOpenMenu = (e: React.MouseEvent<SVGGElement, MouseEvent>) => {
     e.preventDefault();
@@ -552,7 +604,7 @@ export default function NoteNode(node: NodeData) {
         graphType={graphType ?? "detail"}
         browseMode={browseMode}
         size={nodeSize}
-        onSizeChange={setNodeSize}
+        onSizeChange={handleNodeSizeChange}
       />
       {contentType === "IMAGE" && editMode && !isSaving && (
         <rect

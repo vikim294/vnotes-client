@@ -12,7 +12,7 @@ interface NoteNodeViewProps {
   browseMode?: boolean;
   selected?: boolean;
   size?: Size;
-  onSizeChange?: React.Dispatch<React.SetStateAction<Size>>;
+  onSizeChange?: (size: Size) => void;
 }
 
 export default function NoteNodeView({
@@ -170,7 +170,7 @@ interface NodeLabelProps {
   contentType?: NodeContentType;
   browseMode: boolean;
   size: Size;
-  setSize: React.Dispatch<React.SetStateAction<Size>>;
+  setSize: (size: Size) => void;
 }
 
 function NodeLabel({
@@ -349,7 +349,7 @@ interface NodeImageProps {
   imageWidth?: number;
   imageHeight?: number;
   size: Size;
-  setSize: React.Dispatch<React.SetStateAction<Size>>;
+  setSize: (size: Size) => void;
 }
 
 function NodeImage({
