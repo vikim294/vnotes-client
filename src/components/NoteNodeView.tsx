@@ -306,8 +306,7 @@ function NodeLabel({
                   : "white"
             }
             dominantBaseline="central"
-            style={{ fontFamily: "monospace" }}
-            className={browseMode ? "select-none" : ""}
+            className={`node-text-font ${browseMode ? "select-none" : ""}`}
             // 给 <text> 元素添加 xml:space="preserve" 属性，可以保留原始空格和换行（类似于 HTML 中的 <pre> 标签）
             xmlSpace="preserve"
           >

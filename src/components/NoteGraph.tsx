@@ -100,7 +100,7 @@ const DETAIL_FOCUS_CONSUMED_PREFIX = 'vnote-detail-focus-consumed'
 const NODE_LABEL_MAX_LENGTH = 8192
 const NODE_INDENT = '    '
 const NODE_TEXTAREA_CLASS_NAME =
-    'bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] p-2 outline-none'
+    'node-text-font bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] p-2 outline-none'
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
 
 type NodeCreationKind = 'TEXT' | 'IMAGE' | 'ARTICLE' | 'REF'
