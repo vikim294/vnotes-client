@@ -407,6 +407,12 @@ const NoteGraph = memo<NoteGraphProps>(
         const [isRootNodeListOpen, setIsRootNodeListOpen] = useState(false)
         const [nodeMenuVisible, setNodeMenuVisible] = useState(false)
         const nodeMenuRef = useRef<NodeMenuExpose | null>(null)
+
+        const leaveEditMode = () => {
+            setEditMode(false)
+            setNodeMenuVisible(false)
+        }
+
         const [selectedNodeId, setSelectedNodeId] = useState<number | string | null>(null)
         const selectedNode = useMemo(() => {
             return flatTree.find((node) => node.id === selectedNodeId) ?? null
@@ -1215,7 +1221,7 @@ const NoteGraph = memo<NoteGraphProps>(
                     }
 
                     setFlatTree(newFlatTree)
-                    setEditMode(false)
+                    leaveEditMode()
                 } else {
                     Toast.error(res.message || '保存失败')
                 }
@@ -1238,14 +1244,14 @@ const NoteGraph = memo<NoteGraphProps>(
             if (hasModifications) {
                 openExitConfirmModal()
             } else {
-                setEditMode(false)
+                leaveEditMode()
                 // No modifications, no need to refetch data
             }
         }
 
         const handleConfirmExit = () => {
             closeExitConfirmModal()
-            setEditMode(false)
+            leaveEditMode()
             onExitEdit()
         }
 
@@ -1702,7 +1708,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 const allIdsToRemove = new Set([moveSourceNodeId, ...descendants.map((d) => d.id)])
 
                 setFlatTree((prev) => prev.filter((node) => !allIdsToRemove.has(node.id)))
-                setEditMode(false)
+                leaveEditMode()
                 setMoveSuccessTarget({ id: note.id })
             } catch (error) {
                 Toast.error(error instanceof Error ? error.message : '详情节点移动失败')
