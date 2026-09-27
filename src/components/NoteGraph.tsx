@@ -11,12 +11,19 @@ import {
     FileText,
     Home,
     KeyRound,
+    ListTree,
     LoaderCircle,
     LogOut,
+    Hand,
+    MousePointer2,
+    Pencil,
+    Plus,
     Search,
+    Save,
     Tags,
     Trash2,
     Upload,
+    X,
 } from 'lucide-react'
 import { findDescendantsByIdInFlatTree } from '../lib'
 import { useLocation, useNavigate } from 'react-router'
@@ -100,8 +107,16 @@ const DETAIL_FOCUS_CONSUMED_PREFIX = 'vnote-detail-focus-consumed'
 const NODE_LABEL_MAX_LENGTH = 8192
 const NODE_INDENT = '    '
 const NODE_TEXTAREA_CLASS_NAME =
-    'node-text-font bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] p-2 outline-none'
+    'node-text-font bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700/70 p-3 outline-none! transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15'
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
+
+const getNodeListLabel = (node: NodeData) => {
+    const label = node.label?.trim()
+    if (label) return label
+    if (node.contentType === 'IMAGE') return '图片节点'
+    if (node.article) return '文章节点'
+    return '未命名节点'
+}
 
 type NodeCreationKind = 'TEXT' | 'IMAGE' | 'ARTICLE' | 'REF'
 type RefTargetType = 'NOTE' | 'DETAIL' | 'ARTICLE'
@@ -389,12 +404,21 @@ const NoteGraph = memo<NoteGraphProps>(
         // edit mode
         const [editMode, setEditMode] = useState(false)
         const [isSaving, setIsSaving] = useState(false)
+        const [isRootNodeListOpen, setIsRootNodeListOpen] = useState(false)
         const [nodeMenuVisible, setNodeMenuVisible] = useState(false)
         const nodeMenuRef = useRef<NodeMenuExpose | null>(null)
         const [selectedNodeId, setSelectedNodeId] = useState<number | string | null>(null)
         const selectedNode = useMemo(() => {
             return flatTree.find((node) => node.id === selectedNodeId) ?? null
         }, [flatTree, selectedNodeId])
+        const visibleNodes = useMemo(
+            () => flatTree.filter((node) => node.opStatus !== 'deleted'),
+            [flatTree]
+        )
+        const rootNodes = useMemo(
+            () => visibleNodes.filter((node) => node.parentId == null),
+            [visibleNodes]
+        )
         // detail node is only for directory graph
         const [nodeType, setNodeType] = useState<NodeType>('DIRECTORY')
         const [selectableTags, setSelectableTags] = useState<Tag[]>([])
@@ -886,7 +910,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                                         nodeCreationKind === option.value
                                             ? 'border-indigo-500 bg-indigo-500/10 text-indigo-200'
-                                            : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600'
+                                            : 'border-slate-700/60 bg-black/20 text-slate-400 hover:bg-white/5 hover:text-slate-200'
                                     }`}
                                 >
                                     <input
@@ -914,7 +938,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                         event.target.value as RefTargetType
                                     )
                                 }
-                                className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500"
+                                className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15"
                             >
                                 <option value="NOTE">笔记</option>
                                 <option value="DETAIL">详情节点</option>
@@ -1959,14 +1983,14 @@ const NoteGraph = memo<NoteGraphProps>(
                                         className="cursor-pointer p-1 text-[#ffffff5c] transition-colors hover:text-white"
                                         title="Go back"
                                     >
-                                        <ArrowLeft className="h-5 w-5" />
+                                        <ArrowLeft className="h-6 w-6" strokeWidth={1} />
                                     </button>
                                     <button
                                         onClick={() => navigate('/')}
                                         className="cursor-pointer p-1 text-[#ffffff5c] transition-colors hover:text-white"
                                         title="Go to directory"
                                     >
-                                        <Home className="h-5 w-5" />
+                                        <Home className="h-6 w-6" strokeWidth={1} />
                                     </button>
                                 </>
                             )}
@@ -1980,96 +2004,177 @@ const NoteGraph = memo<NoteGraphProps>(
                         </div>
                     )}
 
+                    {visibleNodes.length > 0 && (
+                        <div
+                            className={`fixed z-30 ${
+                                graphType === 'directory'
+                                    ? 'top-4 left-16'
+                                    : 'top-12 left-4'
+                            }`}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setIsRootNodeListOpen((current) => !current)}
+                                className={`grid h-10 w-10 cursor-pointer place-items-center rounded-full shadow-lg backdrop-blur-sm transition-colors ${
+                                    isRootNodeListOpen
+                                        ? 'bg-indigo-500/15 text-indigo-300'
+                                        : 'bg-slate-900/60 text-slate-400 hover:bg-slate-800/75 hover:text-indigo-300'
+                                }`}
+                                title="根节点列表"
+                                aria-label="打开根节点列表"
+                                aria-expanded={isRootNodeListOpen}
+                            >
+                                <ListTree className="h-6 w-6" strokeWidth={1} />
+                            </button>
+
+                            {isRootNodeListOpen && (
+                                <div
+                                    className={`absolute top-0 left-full ml-2 flex h-64 flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md ${
+                                        graphType === 'directory'
+                                            ? 'w-[min(16rem,calc(100vw-8rem))]'
+                                            : 'w-[min(16rem,calc(100vw-5rem))]'
+                                    }`}
+                                >
+                                    <div className="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2.5">
+                                        <span className="text-sm font-medium text-slate-200">
+                                            根节点
+                                        </span>
+                                        <span className="text-xs text-slate-500">
+                                            {rootNodes.length} 个
+                                        </span>
+                                    </div>
+                                    <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+                                        {rootNodes.map((node) => {
+                                            const label = getNodeListLabel(node)
+
+                                            return (
+                                                <li key={node.id}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            graphViewerRef.current?.centerOn(
+                                                                node.x,
+                                                                node.y
+                                                            )
+                                                        }
+                                                        title={label}
+                                                        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-300 transition-colors hover:bg-slate-700/70 hover:text-white"
+                                                    >
+                                                        <span
+                                                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400"
+                                                            aria-hidden="true"
+                                                        />
+                                                        <span className="min-w-0 flex-1 truncate">
+                                                            {label}
+                                                        </span>
+                                                    </button>
+                                                </li>
+                                            )
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {graphType === 'directory' && (
                         <div className="fixed top-4 left-4 flex flex-col gap-2">
                             <button
                                 type="button"
                                 onClick={handleOpenProfile}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300"
                                 title="个人资料"
                                 aria-label="打开个人资料"
                             >
-                                <CircleUserRound className="h-5 w-5" />
+                                <CircleUserRound className="h-6 w-6" strokeWidth={1} />
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsNotificationOpen(true)}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300"
                                 title="消息通知"
                                 aria-label="打开消息通知"
                             >
-                                <Bell className="h-5 w-5" />
+                                <Bell className="h-6 w-6" strokeWidth={1} />
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsTagManagementOpen(true)}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300"
                                 title="标签管理"
                                 aria-label="打开标签管理"
                             >
-                                <Tags className="h-5 w-5" />
+                                <Tags className="h-6 w-6" strokeWidth={1} />
                             </button>
                             <button
                                 type="button"
                                 onClick={openExportModal}
                                 disabled={isExporting}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
                                 title={isExporting ? '正在导出' : '导出笔记'}
                                 aria-label={isExporting ? '正在导出笔记' : '导出笔记'}
                             >
                                 {isExporting ? (
-                                    <LoaderCircle className="h-5 w-5 animate-spin" />
+                                    <LoaderCircle className="h-6 w-6 animate-spin" strokeWidth={1} />
                                 ) : (
-                                    <Download className="h-5 w-5" />
+                                    <Download className="h-6 w-6" strokeWidth={1} />
                                 )}
                             </button>
                             <button
                                 type="button"
                                 onClick={handleOpenImport}
                                 disabled={isImporting}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300 disabled:cursor-wait disabled:opacity-60"
                                 title={isImporting ? '正在导入' : '导入笔记'}
                                 aria-label={isImporting ? '正在导入笔记' : '导入笔记'}
                             >
                                 {isImporting ? (
-                                    <LoaderCircle className="h-5 w-5 animate-spin" />
+                                    <LoaderCircle className="h-6 w-6 animate-spin" strokeWidth={1} />
                                 ) : (
-                                    <Upload className="h-5 w-5" />
+                                    <Upload className="h-6 w-6" strokeWidth={1} />
                                 )}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsTrashBinOpen(true)}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-rose-500/70 hover:text-rose-300"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-rose-950/60 hover:text-rose-300"
                                 title="回收站"
                                 aria-label="打开回收站"
                             >
-                                <Trash2 className="h-5 w-5" />
+                                <Trash2 className="h-6 w-6" strokeWidth={1} />
                             </button>
                             <button
                                 type="button"
                                 onClick={handleLogout}
-                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-rose-500/70 hover:text-rose-300"
+                                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-rose-950/60 hover:text-rose-300"
                                 title="退出登录"
                                 aria-label="退出登录"
                             >
-                                <LogOut className="h-5 w-5" />
+                                <LogOut className="h-6 w-6" strokeWidth={1} />
                             </button>
                         </div>
                     )}
 
                     {!isChoosingParent && chosenParentNodeId === null && (
-                        <div className="fixed top-25 right-0 w-36">
+                        <div className="fixed top-28 right-4 z-30 flex w-44 flex-col gap-1 rounded-xl border border-slate-700/70 bg-slate-950/30 p-1.5 shadow-2xl backdrop-blur-md">
                             {!isSaving && (
                                 <div>
                                     <Button
-                                        className="block w-full"
+                                        glass
+                                        className="w-full justify-start px-3 py-2.5"
                                         onClick={() => {
                                             const newValue = !browseMode
                                             setBrowseMode(newValue)
                                         }}
                                     >
-                                        {browseMode ? 'select mode' : 'browse mode'}
+                                        <div className="flex items-center gap-2">
+                                            {browseMode ? (
+                                                <MousePointer2 className="h-4 w-4 text-indigo-400" />
+                                            ) : (
+                                                <Hand className="h-4 w-4 text-amber-400" />
+                                            )}
+                                            {browseMode ? 'select mode' : 'browse mode'}
+                                        </div>
                                     </Button>
                                 </div>
                             )}
@@ -2079,20 +2184,28 @@ const NoteGraph = memo<NoteGraphProps>(
                                     {/* search button */}
                                     <div>
                                         <Button
-                                            className="flex w-full items-center justify-center"
+                                            glass
+                                            className="w-full justify-start px-3 py-2.5"
                                             onClick={() => setIsSearchModalOpen(true)}
                                         >
-                                            <Search className="h-4 w-4" />
+                                            <div className="flex items-center gap-2">
+                                                <Search className="h-4 w-4 text-cyan-400" />
+                                                search
+                                            </div>
                                         </Button>
                                     </div>
                                     {/* edit mode */}
                                     {!editMode && (
                                         <Button
-                                            className="block w-full"
+                                            glass
+                                            className="w-full justify-start px-3 py-2.5"
                                             type="primary"
                                             onClick={() => setEditMode(true)}
                                         >
-                                            edit mode
+                                            <div className="flex items-center gap-2">
+                                                <Pencil className="h-4 w-4 text-sky-400" />
+                                                edit mode
+                                            </div>
                                         </Button>
                                     )}
 
@@ -2101,31 +2214,47 @@ const NoteGraph = memo<NoteGraphProps>(
                                             {!isSaving && (
                                                 <div>
                                                     <Button
-                                                        className="block w-full"
+                                                        glass
+                                                        className="w-full justify-start px-3 py-2.5"
                                                         type="secondary"
                                                         onClick={handleAddNewNode}
                                                     >
-                                                        add new node
+                                                        <div className="flex items-center gap-2">
+                                                            <Plus className="h-4 w-4 text-emerald-400" />
+                                                            add new node
+                                                        </div>
                                                     </Button>
                                                 </div>
                                             )}
                                             <div>
                                                 <Button
-                                                    className="block w-full"
+                                                    glass
+                                                    className="w-full justify-start px-3 py-2.5"
                                                     type="primary"
                                                     onClick={handleSaveEdit}
                                                     disabled={isSaving}
                                                 >
-                                                    {isSaving ? 'saving...' : 'save'}
+                                                    <div className="flex items-center gap-2">
+                                                        {isSaving ? (
+                                                            <LoaderCircle className="h-4 w-4 animate-spin text-emerald-400" />
+                                                        ) : (
+                                                            <Save className="h-4 w-4 text-emerald-400" />
+                                                        )}
+                                                        {isSaving ? 'saving...' : 'save'}
+                                                    </div>
                                                 </Button>
                                             </div>
                                             {!isSaving && (
                                                 <div>
                                                     <Button
-                                                        className="block w-full"
+                                                        glass
+                                                        className="w-full justify-start px-3 py-2.5"
                                                         onClick={handleExitEdit}
                                                     >
-                                                        exit
+                                                        <div className="flex items-center gap-2">
+                                                            <X className="h-4 w-4 text-amber-400" />
+                                                            exit
+                                                        </div>
                                                     </Button>
                                                 </div>
                                             )}
@@ -2817,7 +2946,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                         正文
                                     </span>
                                     <textarea
-                                        className="bg-textarea min-h-96 w-full resize-y overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700 p-4 leading-7 text-slate-100 outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                        className="bg-textarea min-h-96 w-full resize-y overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700/70 p-4 leading-7 text-slate-100 outline-none! transition-colors focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/15"
                                         wrap="off"
                                         value={articleContent}
                                         onChange={(event) => setArticleContent(event.target.value)}
@@ -2844,13 +2973,14 @@ const NoteGraph = memo<NoteGraphProps>(
                             footer={
                                 <div className="flex items-center gap-4">
                                     {graphType === 'directory' && (
-                                        <label>
+                                        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700/60 bg-black/20 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-slate-100">
                                             <input
                                                 type="checkbox"
                                                 checked={nodeType === 'DETAIL'}
                                                 onChange={(e) => handleDirectoryNodeTypeChange(e.target.checked)}
+                                                className="h-4 w-4 cursor-pointer accent-indigo-500"
                                             />
-                                            detail node
+                                            <span>detail node</span>
                                         </label>
                                     )}
                                     <Button
@@ -2958,13 +3088,14 @@ const NoteGraph = memo<NoteGraphProps>(
                             footer={
                                 <div className="flex items-center gap-4">
                                     {graphType === 'directory' && (
-                                        <label>
+                                        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700/60 bg-black/20 px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-slate-100">
                                             <input
                                                 type="checkbox"
                                                 checked={nodeType === 'DETAIL'}
                                                 onChange={(e) => handleDirectoryNodeTypeChange(e.target.checked)}
+                                                className="h-4 w-4 cursor-pointer accent-indigo-500"
                                             />
-                                            detail node
+                                            <span>detail node</span>
                                         </label>
                                     )}
                                     <Button

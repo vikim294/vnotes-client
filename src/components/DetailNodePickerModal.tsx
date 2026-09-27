@@ -128,8 +128,8 @@ export default function DetailNodePickerModal({
 
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="border-surface-700 bg-black flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border shadow-2xl">
-                <header className="border-surface-700 gap-4 border-b px-6 py-4">
+            <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-700/60 bg-black shadow-2xl">
+                <header className="gap-4 border-b border-slate-700/60 px-6 py-4">
                     <div>
                         <h2 className="text-lg font-semibold text-slate-100">
                             选择{targetLabel}
@@ -168,7 +168,7 @@ export default function DetailNodePickerModal({
                     )}
                 </div>
 
-                <footer className="border-surface-700 bg-black flex justify-end gap-2 border-t px-6 py-4">
+                <footer className="flex justify-end gap-2 border-t border-slate-700/60 bg-black px-6 py-4">
                     <Button onClick={onClose}>取消</Button>
                     <Button
                         type="primary"

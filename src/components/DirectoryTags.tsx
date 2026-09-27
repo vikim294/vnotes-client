@@ -19,7 +19,7 @@ export function NoteTagList({ tags }: NoteTagListProps) {
                 <span
                     key={tag.id}
                     title={tag.name}
-                    className="inline-flex max-w-40 items-center gap-1 rounded-full border border-indigo-400/20 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-200/80"
+                    className="inline-flex max-w-40 items-center gap-1 rounded-md border border-slate-700/60 bg-black/20 px-2 py-1 text-xs text-slate-300 backdrop-blur-sm"
                 >
                     <TagIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                     <span className="truncate">{tag.name}</span>

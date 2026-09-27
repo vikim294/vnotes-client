@@ -272,10 +272,10 @@ export default function TrashBinModal({
             onPointerDown={handleClose}
         >
             <div
-                className="bg-surface-900 border-surface-700 flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+                className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md"
                 onPointerDown={(event) => event.stopPropagation()}
             >
-                <div className="border-surface-700 border-b bg-gradient-to-b from-slate-800/55 to-slate-900/20 px-5 pt-5 pb-4">
+                <div className="border-b border-slate-700/60 bg-black/20 px-5 pt-5 pb-4">
                     <div className="mb-3 flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500/10 text-rose-400">
@@ -338,7 +338,7 @@ export default function TrashBinModal({
                     </div>
                 </div>
 
-                <div className="border-surface-700 border-b bg-slate-900/45 px-5 py-4">
+                <div className="border-b border-slate-700/60 bg-black/15 px-5 py-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
                             <SlidersHorizontal className="h-4 w-4 text-slate-500" />
@@ -371,7 +371,7 @@ export default function TrashBinModal({
                                     clearSelection()
                                     resetPage()
                                 }}
-                                className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500"
+                                className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/15"
                             >
                                 <option value="">全部类型</option>
                                 <option value="DIRECTORY">目录</option>
@@ -392,7 +392,7 @@ export default function TrashBinModal({
                                     clearSelection()
                                     resetPage()
                                 }}
-                                className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500"
+                                className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/15"
                             />
                         </label>
 
@@ -409,13 +409,13 @@ export default function TrashBinModal({
                                     clearSelection()
                                     resetPage()
                                 }}
-                                className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500"
+                                className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-rose-500/60 focus:ring-2 focus:ring-rose-500/15"
                             />
                         </label>
                     </div>
                 </div>
 
-                <div className="border-surface-700 flex min-h-12 items-center justify-between gap-3 border-b bg-slate-900/65 px-5 py-2.5">
+                <div className="flex min-h-12 items-center justify-between gap-3 border-b border-slate-700/60 bg-black/25 px-5 py-2.5">
                     <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
                         <input
                             type="checkbox"
@@ -471,7 +471,7 @@ export default function TrashBinModal({
                             没有找到符合条件的删除记录
                         </div>
                     ) : (
-                        <ul className="divide-surface-700 divide-y">
+                        <ul className="divide-y divide-slate-700/60">
                             {result.list.map((node) => (
                                 <li
                                     key={node.id}
@@ -516,7 +516,7 @@ export default function TrashBinModal({
                     )}
                 </div>
 
-                <div className="border-surface-700 flex flex-col gap-3 border-t bg-slate-900/55 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 border-t border-slate-700/60 bg-black/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-slate-400">
                         共 <span className="font-medium text-slate-200">{result.total}</span> 条，
                         第 <span className="font-medium text-slate-200">{page}</span> / {totalPages} 页
@@ -578,9 +578,9 @@ export default function TrashBinModal({
                         role="alertdialog"
                         aria-modal="true"
                         aria-labelledby="trash-delete-confirm-title"
-                        className="border-surface-700 bg-surface-900 w-full max-w-md rounded-xl border shadow-2xl"
+                        className="w-full max-w-md rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md"
                     >
-                        <div className="border-surface-700 flex items-center gap-3 border-b px-6 py-4">
+                        <div className="flex items-center gap-3 border-b border-slate-700/60 px-6 py-4">
                             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-rose-500/10 text-rose-400">
                                 <Trash2 className="h-4.5 w-4.5" />
                             </span>
@@ -603,7 +603,7 @@ export default function TrashBinModal({
                                 关联的详情内容和图片文件也会一并删除，此操作无法撤销。
                             </p>
                         </div>
-                        <div className="border-surface-700 flex justify-end gap-3 border-t bg-slate-900/55 px-6 py-4">
+                        <div className="flex justify-end gap-3 border-t border-slate-700/60 bg-black/20 px-6 py-4">
                             <button
                                 type="button"
                                 disabled={isDeleting}

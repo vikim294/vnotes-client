@@ -439,11 +439,11 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                             onResetView?.()
                             resetView()
                         }}
-                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-slate-700 bg-slate-900/85 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:border-indigo-500/70 hover:text-indigo-300"
+                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300"
                         title="重置视图"
                         aria-label="重置视图"
                     >
-                        <RotateCcw className="h-5 w-5" />
+                        <RotateCcw className="h-6 w-6" strokeWidth={1} />
                     </button>
                 </div>
             )}

@@ -198,10 +198,10 @@ export default function TagManagementModal({ isOpen, onClose }: TagManagementMod
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="tag-management-title"
-                className="border-surface-700 bg-surface-900 flex max-h-[min(84vh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+                className="flex max-h-[min(84vh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md"
                 onPointerDown={(event) => event.stopPropagation()}
             >
-                <header className="border-surface-700 flex items-center justify-between border-b px-6 py-4">
+                <header className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
                     <div className="flex items-center gap-3">
                         <span className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500/10 text-indigo-300">
                             <TagIcon className="h-5 w-5" aria-hidden="true" />
@@ -222,7 +222,7 @@ export default function TagManagementModal({ isOpen, onClose }: TagManagementMod
                     </button>
                 </header>
 
-                <div className="border-surface-700 border-b px-6 py-4">
+                <div className="border-b border-slate-700/60 px-6 py-4">
                     <form className="flex gap-3" onSubmit={(event) => void handleCreate(event)}>
                         <input
                             ref={createInputRef}
@@ -309,7 +309,7 @@ export default function TagManagementModal({ isOpen, onClose }: TagManagementMod
                                                         className="w-full rounded-md border border-indigo-500 bg-slate-950 px-2.5 py-1.5 text-sm text-slate-100 outline-none"
                                                     />
                                                 ) : (
-                                                    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-indigo-200">
+                                                    <span className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-700/60 bg-black/20 px-3 py-1.5 text-slate-300">
                                                         <TagIcon className="h-3.5 w-3.5 shrink-0" />
                                                         <span className="truncate" title={tag.name}>{tag.name}</span>
                                                     </span>

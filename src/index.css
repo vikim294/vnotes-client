@@ -29,8 +29,8 @@
   --color-error: #e74c3c; 
   --color-danger-hover: #dc2626; /* Red-600 */
   
-  --color-textarea: #1f2937; /* Gray-800 - input backgrounds */
-  --color-textarea-border: #374151; /* Gray-700 */
+  --color-textarea: rgb(0 0 0 / 0.28);
+  --color-textarea-border: rgb(71 85 105 / 0.7);
   --color-textarea-focus: #6366f1; /* Indigo-500 */
   
   /* Typography */

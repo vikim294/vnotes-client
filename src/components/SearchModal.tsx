@@ -271,11 +271,11 @@ export default function SearchModal({
             onPointerDown={handleClose}
         >
             <div
-                className="bg-surface-900 border-surface-700 max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl border shadow-2xl"
+                className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md"
                 onPointerDown={(event) => event.stopPropagation()}
             >
                 <div className='max-h-[35vh] overflow-auto'>
-                    <div className="border-surface-700 border-b bg-gradient-to-b from-slate-800/55 to-slate-900/20 px-5 pt-5 pb-4">
+                    <div className="border-b border-slate-700/60 bg-black/20 px-5 pt-5 pb-4">
                         <div className="mb-4 flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-lg font-semibold tracking-tight text-slate-100">
@@ -383,7 +383,7 @@ export default function SearchModal({
                                                     inputRef.current?.focus()
                                                 }}
                                                 title={history.keyword}
-                                                className="max-w-48 cursor-pointer truncate rounded-md border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs text-slate-300 transition-colors hover:border-indigo-500/60 hover:bg-indigo-500/10 hover:text-indigo-200"
+                                                className="max-w-48 cursor-pointer truncate rounded-md border border-slate-700/60 bg-black/20 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
                                             >
                                                 {history.keyword}
                                             </button>
@@ -394,7 +394,7 @@ export default function SearchModal({
                         )}
                     </div>
 
-                    <div className="bg-slate-900/45 px-5 py-4">
+                    <div className="bg-black/15 px-5 py-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
                                 <SlidersHorizontal className="h-4 w-4 text-slate-500" />
@@ -427,7 +427,7 @@ export default function SearchModal({
                                         setNodeType(event.target.value as NodeType | '')
                                         resetPage()
                                     }}
-                                    className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-65"
+                                    className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15 disabled:cursor-not-allowed disabled:opacity-65"
                                 >
                                     {mode !== 'select' && <option value="">全部类型</option>}
                                     <option value="DIRECTORY">目录</option>
@@ -447,7 +447,7 @@ export default function SearchModal({
                                         setStartDate(event.target.value)
                                         resetPage()
                                     }}
-                                    className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500"
+                                    className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15"
                                 />
                             </label>
 
@@ -463,7 +463,7 @@ export default function SearchModal({
                                         setEndDate(event.target.value)
                                         resetPage()
                                     }}
-                                    className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500"
+                                    className="h-10 rounded-lg border border-slate-700/70 bg-black/25 px-3 text-sm text-slate-200 outline-none transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15"
                                 />
                             </label>
                         </div>
@@ -486,7 +486,7 @@ export default function SearchModal({
                     </div>
                 </div>
 
-                <div className='border-surface-700 border-t'></div>
+                <div className="border-t border-slate-700/60"></div>
 
                 <div className='max-h-[55vh] overflow-auto relative'>
                     <div className="">
@@ -504,7 +504,7 @@ export default function SearchModal({
                                 没有找到符合条件的节点
                             </div>
                         ) : (
-                            <ul className="divide-surface-700 divide-y">
+                            <ul className="divide-y divide-slate-700/60">
                                 {result.list.map((note) => {
                                     const isCurrentNote = note.id === excludeNoteId
 
@@ -527,7 +527,7 @@ export default function SearchModal({
                                                             <span
                                                                 key={tag.id}
                                                                 title={tag.name}
-                                                                className="inline-flex max-w-36 items-center gap-1 rounded-full border border-indigo-400/20 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-200/80"
+                                                                className="inline-flex max-w-36 items-center gap-1 rounded-md border border-slate-700/60 bg-black/20 px-2 py-1 text-xs text-slate-300"
                                                             >
                                                                 <TagIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                                                                 <span className="truncate">{tag.name}</span>
@@ -537,17 +537,17 @@ export default function SearchModal({
                                                 )}
                                             </span>
                                             <span
-                                                className={`rounded-full px-2 py-0.5 text-xs ${
+                                                className={`rounded-md border px-2 py-1 text-xs ${
                                                     note.nodeType === 'DETAIL'
-                                                        ? 'bg-emerald-500/10 text-emerald-400'
-                                                        : 'bg-blue-500/10 text-blue-400'
+                                                        ? 'border-emerald-500/25 bg-emerald-500/5 text-emerald-300'
+                                                        : 'border-blue-500/25 bg-blue-500/5 text-blue-300'
                                                 }`}
                                             >
                                                 {note.nodeType === 'DETAIL' ? '详情' : '目录'}
                                             </span>
                                             {note.shared && (
                                                 <span
-                                                    className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-300"
+                                                    className="inline-flex items-center gap-1 rounded-md border border-blue-500/20 bg-blue-500/5 px-2 py-1 text-xs text-blue-300"
                                                     title="这篇笔记已分享"
                                                 >
                                                     <Share2 className="h-3 w-3" aria-hidden="true" />
@@ -577,7 +577,7 @@ export default function SearchModal({
                         )}
                     </div>
 
-                    <div className="sticky left-0 right-0 bottom-0 border-surface-700 flex flex-col gap-3 border-t bg-black px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="sticky right-0 bottom-0 left-0 flex flex-col gap-3 border-t border-slate-700/60 bg-black px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-slate-400">
                             共 <span className="font-medium text-slate-200">{result.total}</span> 条，
                             第 <span className="font-medium text-slate-200">{page}</span> / {totalPages} 页

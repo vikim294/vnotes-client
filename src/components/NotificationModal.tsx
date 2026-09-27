@@ -84,10 +84,10 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="notification-modal-title"
-                className="border-surface-700 bg-surface-900 flex max-h-[min(80vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-xl border shadow-2xl"
+                className="flex max-h-[min(80vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md"
                 onPointerDown={(event) => event.stopPropagation()}
             >
-                <header className="border-surface-700 flex items-center justify-between border-b px-6 py-4">
+                <header className="flex items-center justify-between border-b border-slate-700/60 px-6 py-4">
                     <div className="flex items-center gap-3">
                         <span className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500/10 text-indigo-300">
                             <Bell className="h-5 w-5" aria-hidden="true" />

@@ -157,16 +157,16 @@ export default function NodeMenu({
         <div className="fixed top-0 right-0 bottom-0 left-0" onPointerDown={onClose}>
             {/* 菜单容器，定位在点击位置 */}
             <div
-                className={`bg-plain fixed`}
+                className="fixed flex flex-col gap-1 rounded-xl border border-slate-700/70 bg-slate-950/30 p-1.5 shadow-2xl backdrop-blur-md"
                 style={{ top: position.y, left: position.x }}
                 onPointerDown={(e) => e.stopPropagation()} // 阻止事件冒泡，防止点击菜单时关闭
                 ref={nodemenuElRef}
             >
                 {/* 图片节点暂不支持替换图片，只能在画布上调整位置和大小。 */}
                 {selectedNode?.contentType !== 'IMAGE' && (
-                    <Button className="block w-full" onClick={onEdit}>
+                    <Button glass className="block w-full" onClick={onEdit}>
                         <div className="flex items-center gap-2">
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-4 w-4 text-sky-400" />
                             edit text
                         </div>
                     </Button>
@@ -174,42 +174,42 @@ export default function NodeMenu({
                 {selectedNode?.nodeType !== 'DETAIL' && (
                     // 非 detail 节点才能新增子结点
                     // detail 节点是叶子节点，不允许有子节点
-                    <Button className="block w-full" onClick={onAddChild}>
+                    <Button glass className="block w-full" onClick={onAddChild}>
                         <div className="flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
+                            <Plus className="h-4 w-4 text-emerald-400" />
                             add child node
                         </div>
                     </Button>
                 )}
                 {/* 设置父节点 - 用于重新组织树的结构 */}
-                <Button className="block w-full" onClick={onSetParent}>
+                <Button glass className="block w-full" onClick={onSetParent}>
                     <div className="flex items-center gap-2">
-                        <Link className="h-4 w-4" />
+                        <Link className="h-4 w-4 text-indigo-400" />
                         set parent node
                     </div>
                 </Button>
                 {/* 断开与父节点的连接 - 将节点变为根节点 */}
-                <Button className="block w-full" onClick={onDisconnectFromParent}>
+                <Button glass className="block w-full" onClick={onDisconnectFromParent}>
                     <div className="flex items-center gap-2">
-                        <Unlink className="h-4 w-4" />
+                        <Unlink className="h-4 w-4 text-amber-400" />
                         disconnect from parent
                     </div>
                 </Button>
                 {/* Move to — only in detail graph */}
                 {graphType === 'detail' && (
-                    <Button className="block w-full" onClick={onMoveTo}>
+                    <Button glass className="block w-full" onClick={onMoveTo}>
                         <div className="flex items-center gap-2">
-                            <ArrowRightLeft className="h-4 w-4" />
+                            <ArrowRightLeft className="h-4 w-4 text-cyan-400" />
                             move to
                         </div>
                     </Button>
                 )}
                 {/* 标记功能 - 仅在 detail 视图中可用，且图片节点不支持标记 */}
                 {graphType === 'detail' && selectedNode?.contentType !== 'IMAGE' && (
-                    <Button className="block w-full" onClick={onOpenMark}>
+                    <Button glass className="block w-full" onClick={onOpenMark}>
                         <div className="flex items-center gap-2">
                             <Bookmark
-                                className="h-4 w-4"
+                                className="h-4 w-4 text-yellow-400"
                                 fill={selectedNode?.markType ? 'currentColor' : 'none'}
                             />
                             mark
@@ -219,26 +219,26 @@ export default function NodeMenu({
                 {graphType === 'detail' &&
                     selectedNode?.article === true &&
                     typeof selectedNode.id === 'number' && (
-                        <Button className="block w-full" onClick={onOpenArticle}>
+                        <Button glass className="block w-full" onClick={onOpenArticle}>
                             <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4" />
+                                <FileText className="h-4 w-4 text-sky-400" />
                                 edit article
                             </div>
                         </Button>
                     )}
                 {/* 分享功能 - 仅在 directory 视图中的 detail 节点上显示 */}
                 {graphType === 'directory' && selectedNode?.nodeType === 'DETAIL' && (
-                    <Button className="block w-full" onClick={onToggleShare}>
+                    <Button glass className="block w-full" onClick={onToggleShare}>
                         <div className="flex items-center gap-2">
-                            <Share2 className="h-4 w-4" />
+                            <Share2 className="h-4 w-4 text-blue-400" />
                             {selectedNode?.shared ? 'share detail' : 'share'}
                         </div>
                     </Button>
                 )}
                 {/* 删除节点 - 危险操作，使用 danger 样式 */}
-                <Button type="danger" className="block w-full" onClick={onDelete}>
+                <Button glass type="danger" className="block w-full" onClick={onDelete}>
                     <div className="flex items-center gap-2">
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 text-rose-400" />
                         delete
                     </div>
                 </Button>
