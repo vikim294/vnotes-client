@@ -2010,11 +2010,10 @@ const NoteGraph = memo<NoteGraphProps>(
                         </div>
                     )}
 
-                    {visibleNodes.length > 0 && (
-                        <div
+                    <div
                             className={`fixed z-30 ${
                                 graphType === 'directory'
-                                    ? 'top-4 left-16'
+                                    ? 'top-4 left-4'
                                     : 'top-12 left-4'
                             }`}
                         >
@@ -2080,11 +2079,10 @@ const NoteGraph = memo<NoteGraphProps>(
                                     </ul>
                                 </div>
                             )}
-                        </div>
-                    )}
+                    </div>
 
                     {graphType === 'directory' && (
-                        <div className="fixed top-4 left-4 flex flex-col gap-2">
+                        <div className="fixed top-16 left-4 flex flex-col gap-2">
                             <button
                                 type="button"
                                 onClick={handleOpenProfile}
@@ -2162,12 +2160,12 @@ const NoteGraph = memo<NoteGraphProps>(
                     )}
 
                     {!isChoosingParent && chosenParentNodeId === null && (
-                        <div className="fixed top-28 right-4 z-30 flex w-44 flex-col gap-1 rounded-xl border border-slate-700/70 bg-slate-950/30 p-1.5 shadow-2xl backdrop-blur-md">
+                        <div className="fixed top-28 right-2 z-30 flex w-12 flex-col gap-1 rounded-xl border border-slate-700/70 bg-slate-950/30 p-1.5 shadow-2xl backdrop-blur-md sm:right-4 sm:w-44">
                             {!isSaving && (
                                 <div>
                                     <Button
                                         glass
-                                        className="w-full justify-start px-3 py-2.5"
+                                        className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
                                         onClick={() => {
                                             const newValue = !browseMode
                                             setBrowseMode(newValue)
@@ -2175,11 +2173,13 @@ const NoteGraph = memo<NoteGraphProps>(
                                     >
                                         <div className="flex items-center gap-2">
                                             {browseMode ? (
-                                                <MousePointer2 className="h-4 w-4 text-indigo-400" />
+                                                <MousePointer2 className="h-5 w-5 text-indigo-400 sm:h-4 sm:w-4" />
                                             ) : (
-                                                <Hand className="h-4 w-4 text-amber-400" />
+                                                <Hand className="h-5 w-5 text-amber-400 sm:h-4 sm:w-4" />
                                             )}
-                                            {browseMode ? 'select mode' : 'browse mode'}
+                                            <span className="sr-only sm:not-sr-only">
+                                                {browseMode ? 'select mode' : 'browse mode'}
+                                            </span>
                                         </div>
                                     </Button>
                                 </div>
@@ -2191,12 +2191,12 @@ const NoteGraph = memo<NoteGraphProps>(
                                     <div>
                                         <Button
                                             glass
-                                            className="w-full justify-start px-3 py-2.5"
+                                            className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
                                             onClick={() => setIsSearchModalOpen(true)}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <Search className="h-4 w-4 text-cyan-400" />
-                                                search
+                                                <Search className="h-5 w-5 text-cyan-400 sm:h-4 sm:w-4" />
+                                                <span className="sr-only sm:not-sr-only">search</span>
                                             </div>
                                         </Button>
                                     </div>
@@ -2204,13 +2204,13 @@ const NoteGraph = memo<NoteGraphProps>(
                                     {!editMode && (
                                         <Button
                                             glass
-                                            className="w-full justify-start px-3 py-2.5"
+                                            className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
                                             type="primary"
                                             onClick={() => setEditMode(true)}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <Pencil className="h-4 w-4 text-sky-400" />
-                                                edit mode
+                                                <Pencil className="h-5 w-5 text-sky-400 sm:h-4 sm:w-4" />
+                                                <span className="sr-only sm:not-sr-only">edit mode</span>
                                             </div>
                                         </Button>
                                     )}
@@ -2221,13 +2221,13 @@ const NoteGraph = memo<NoteGraphProps>(
                                                 <div>
                                                     <Button
                                                         glass
-                                                        className="w-full justify-start px-3 py-2.5"
+                                                        className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
                                                         type="secondary"
                                                         onClick={handleAddNewNode}
                                                     >
                                                         <div className="flex items-center gap-2">
-                                                            <Plus className="h-4 w-4 text-emerald-400" />
-                                                            add new node
+                                                            <Plus className="h-5 w-5 text-emerald-400 sm:h-4 sm:w-4" />
+                                                            <span className="sr-only sm:not-sr-only">add new node</span>
                                                         </div>
                                                     </Button>
                                                 </div>
@@ -2235,18 +2235,20 @@ const NoteGraph = memo<NoteGraphProps>(
                                             <div>
                                                 <Button
                                                     glass
-                                                    className="w-full justify-start px-3 py-2.5"
+                                                    className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
                                                     type="primary"
                                                     onClick={handleSaveEdit}
                                                     disabled={isSaving}
                                                 >
                                                     <div className="flex items-center gap-2">
                                                         {isSaving ? (
-                                                            <LoaderCircle className="h-4 w-4 animate-spin text-emerald-400" />
+                                                            <LoaderCircle className="h-5 w-5 animate-spin text-emerald-400 sm:h-4 sm:w-4" />
                                                         ) : (
-                                                            <Save className="h-4 w-4 text-emerald-400" />
+                                                            <Save className="h-5 w-5 text-emerald-400 sm:h-4 sm:w-4" />
                                                         )}
-                                                        {isSaving ? 'saving...' : 'save'}
+                                                        <span className="sr-only sm:not-sr-only">
+                                                            {isSaving ? 'saving...' : 'save'}
+                                                        </span>
                                                     </div>
                                                 </Button>
                                             </div>
@@ -2254,12 +2256,12 @@ const NoteGraph = memo<NoteGraphProps>(
                                                 <div>
                                                     <Button
                                                         glass
-                                                        className="w-full justify-start px-3 py-2.5"
+                                                        className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
                                                         onClick={handleExitEdit}
                                                     >
                                                         <div className="flex items-center gap-2">
-                                                            <X className="h-4 w-4 text-amber-400" />
-                                                            exit
+                                                            <X className="h-5 w-5 text-amber-400 sm:h-4 sm:w-4" />
+                                                            <span className="sr-only sm:not-sr-only">exit</span>
                                                         </div>
                                                     </Button>
                                                 </div>
