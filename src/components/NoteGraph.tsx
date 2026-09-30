@@ -108,7 +108,35 @@ const NODE_LABEL_MAX_LENGTH = 8192
 const NODE_INDENT = '    '
 const NODE_TEXTAREA_CLASS_NAME =
     'node-text-font bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700/70 p-3 outline-none! transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15'
+const NODE_TEXTAREA_DESKTOP_MEDIA = '(min-width: 768px)'
+const NODE_TEXTAREA_MAX_HEIGHT = 350
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
+
+const resizeNodeTextarea = (textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) return
+
+    if (!window.matchMedia(NODE_TEXTAREA_DESKTOP_MEDIA).matches) {
+        textarea.style.height = ''
+        textarea.style.overflowY = ''
+        return
+    }
+
+    // 先恢复 rows 决定的默认高度，再测量完整内容高度；这样内容删除后也能缩回去
+    textarea.style.height = ''
+    
+    const minHeight = textarea.offsetHeight
+    const borderHeight = textarea.offsetHeight - textarea.clientHeight
+
+    textarea.style.height = '0px'
+    const contentHeight = textarea.scrollHeight + borderHeight
+    const nextHeight = Math.min(
+        Math.max(minHeight, contentHeight),
+        NODE_TEXTAREA_MAX_HEIGHT
+    )
+
+    textarea.style.height = `${nextHeight}px`
+    textarea.style.overflowY = contentHeight > NODE_TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden'
+}
 
 const getNodeListLabel = (node: NodeData) => {
     const label = node.label?.trim()
@@ -440,7 +468,10 @@ const NoteGraph = memo<NoteGraphProps>(
             openModal: openNewNodeAddModal,
             closeModal: closeNewNodeAddModal,
         } = useModal({
-            onModalVisible: useCallback(() => newNodeAddModalInputRef.current?.focus(), []),
+            onModalVisible: useCallback(() => {
+                resizeNodeTextarea(newNodeAddModalInputRef.current)
+                newNodeAddModalInputRef.current?.focus()
+            }, []),
         })
         const newNodeAddModalInputRef = useRef<HTMLTextAreaElement>(null)
         // for choosing new node content type: text or image
@@ -479,6 +510,7 @@ const NoteGraph = memo<NoteGraphProps>(
             closeModal: closeNodeEditModal,
         } = useModal({
             onModalVisible: useCallback(() => {
+                resizeNodeTextarea(nodeEditModalInputRef.current)
                 nodeEditModalInputRef.current?.focus()
                 // ⚠️ textarea 会把光标移动到文本前面，这里把光标移动到文本后面
                 const len = nodeEditModalInputRef.current?.value.length ?? 0
@@ -487,6 +519,12 @@ const NoteGraph = memo<NoteGraphProps>(
         })
         const [nodeEditContent, setNodeEditContent] = useState('')
         const nodeEditModalInputRef = useRef<HTMLTextAreaElement>(null)
+        const handleNodeEditContentChange = (
+            event: React.ChangeEvent<HTMLTextAreaElement>
+        ) => {
+            setNodeEditContent(event.target.value)
+            resizeNodeTextarea(event.currentTarget)
+        }
 
         // article content belongs to a persisted detail node and is saved independently.
         const {
@@ -509,9 +547,24 @@ const NoteGraph = memo<NoteGraphProps>(
             openModal: openNodeAddModal,
             closeModal: closeNodeAddModal,
         } = useModal({
-            onModalVisible: useCallback(() => nodeAddModalInputRef.current?.focus(), []),
+            onModalVisible: useCallback(() => {
+                resizeNodeTextarea(nodeAddModalInputRef.current)
+                nodeAddModalInputRef.current?.focus()
+            }, []),
         })
         const nodeAddModalInputRef = useRef<HTMLTextAreaElement>(null)
+
+        useEffect(() => {
+            const desktopMedia = window.matchMedia(NODE_TEXTAREA_DESKTOP_MEDIA)
+            const syncTextareaHeights = () => {
+                resizeNodeTextarea(newNodeAddModalInputRef.current)
+                resizeNodeTextarea(nodeEditModalInputRef.current)
+                resizeNodeTextarea(nodeAddModalInputRef.current)
+            }
+
+            desktopMedia.addEventListener('change', syncTextareaHeights)
+            return () => desktopMedia.removeEventListener('change', syncTextareaHeights)
+        }, [])
 
         // set parent node
         const [isChoosingParent, setIsChoosingParent] = useState(false)
@@ -3017,7 +3070,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                             rows={6}
                                             maxLength={NODE_LABEL_MAX_LENGTH}
                                             value={nodeEditContent}
-                                            onChange={(e) => setNodeEditContent(e.target.value)}
+                                            onChange={handleNodeEditContentChange}
                                             onKeyDown={handleNodeTextareaKeyDown}
                                         />
                                     ) : (
@@ -3065,7 +3118,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                     rows={6}
                                     maxLength={NODE_LABEL_MAX_LENGTH}
                                     value={nodeEditContent}
-                                    onChange={(e) => setNodeEditContent(e.target.value)}
+                                    onChange={handleNodeEditContentChange}
                                     onKeyDown={handleNodeTextareaKeyDown}
                                 />
                             )}
@@ -3132,7 +3185,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                             rows={6}
                                             maxLength={NODE_LABEL_MAX_LENGTH}
                                             value={nodeEditContent}
-                                            onChange={(e) => setNodeEditContent(e.target.value)}
+                                            onChange={handleNodeEditContentChange}
                                             onKeyDown={handleNodeTextareaKeyDown}
                                         />
                                     ) : (
