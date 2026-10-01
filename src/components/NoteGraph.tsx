@@ -599,8 +599,11 @@ const NoteGraph = memo<NoteGraphProps>(
         const [shareAccessLogs, setShareAccessLogs] = useState<NoteShareAccessLog[]>([])
         const [isShareAccessLogsLoading, setIsShareAccessLogsLoading] = useState(false)
         const [shareAccessLogsError, setShareAccessLogsError] = useState<string | null>(null)
+        const [shareAccessLogsCursor, setShareAccessLogsCursor] = useState<string | null>(null)
+        const [shareAccessLogsHasMore, setShareAccessLogsHasMore] = useState(false)
         const shareDetailRequestRef = useRef(0)
         const shareAccessLogsRequestRef = useRef(0)
+        const shareAccessLogsLoadingRef = useRef(false)
         const shareLink = shareDetail
             ? `${SHARE_NOTE_BASE_URL}/${encodeURIComponent(shareDetail.shareToken)}`
             : ''
@@ -1447,16 +1450,34 @@ const NoteGraph = memo<NoteGraphProps>(
             closeNodeMarkModal()
         }
 
-        const loadShareAccessLogs = async (noteShareId: number) => {
+        const loadShareAccessLogs = async (noteShareId: number, cursor?: string) => {
+            if (shareAccessLogsLoadingRef.current) return
+
+            const isLoadingMore = Boolean(cursor)
             const requestId = ++shareAccessLogsRequestRef.current
-            setShareAccessLogs([])
+            shareAccessLogsLoadingRef.current = true
+            if (!isLoadingMore) {
+                setShareAccessLogs([])
+                setShareAccessLogsCursor(null)
+                setShareAccessLogsHasMore(false)
+            }
             setShareAccessLogsError(null)
             setIsShareAccessLogsLoading(true)
 
             try {
-                const accessLogs = await getNoteShareAccessLogs(noteShareId)
+                const page = await getNoteShareAccessLogs(noteShareId, cursor)
                 if (requestId !== shareAccessLogsRequestRef.current) return
-                setShareAccessLogs(accessLogs)
+                setShareAccessLogs((current) => {
+                    if (!isLoadingMore) return page.list
+
+                    const loadedIds = new Set(current.map((accessLog) => accessLog.id))
+                    return [
+                        ...current,
+                        ...page.list.filter((accessLog) => !loadedIds.has(accessLog.id)),
+                    ]
+                })
+                setShareAccessLogsCursor(page.nextCursor)
+                setShareAccessLogsHasMore(page.hasMore && page.nextCursor !== null)
             } catch (error) {
                 if (requestId !== shareAccessLogsRequestRef.current) return
                 setShareAccessLogsError(
@@ -1464,19 +1485,44 @@ const NoteGraph = memo<NoteGraphProps>(
                 )
             } finally {
                 if (requestId === shareAccessLogsRequestRef.current) {
+                    shareAccessLogsLoadingRef.current = false
                     setIsShareAccessLogsLoading(false)
                 }
             }
         }
 
+        const handleShareAccessLogsScroll = (
+            event: React.UIEvent<HTMLDivElement>
+        ) => {
+            const container = event.currentTarget
+            const distanceToBottom =
+                container.scrollHeight - container.scrollTop - container.clientHeight
+
+            if (
+                distanceToBottom > 24 ||
+                !shareDetail ||
+                !shareAccessLogsHasMore ||
+                !shareAccessLogsCursor ||
+                shareAccessLogsError !== null ||
+                shareAccessLogsLoadingRef.current
+            ) {
+                return
+            }
+
+            void loadShareAccessLogs(shareDetail.id, shareAccessLogsCursor)
+        }
+
         const loadShareDetail = async (nodeId: number) => {
             const requestId = ++shareDetailRequestRef.current
             shareAccessLogsRequestRef.current += 1
+            shareAccessLogsLoadingRef.current = false
             setShareDetailNodeId(nodeId)
             setShareDetail(null)
             setShareDetailError(null)
             setIsShareDetailLoading(true)
             setShareAccessLogs([])
+            setShareAccessLogsCursor(null)
+            setShareAccessLogsHasMore(false)
             setShareAccessLogsError(null)
             setIsShareAccessLogsLoading(false)
             openShareNoteModal()
@@ -1538,11 +1584,14 @@ const NoteGraph = memo<NoteGraphProps>(
         const handleCloseShareDetail = () => {
             shareDetailRequestRef.current += 1
             shareAccessLogsRequestRef.current += 1
+            shareAccessLogsLoadingRef.current = false
             closeShareNoteModal()
             setShareDetail(null)
             setShareDetailNodeId(null)
             setShareDetailError(null)
             setShareAccessLogs([])
+            setShareAccessLogsCursor(null)
+            setShareAccessLogsHasMore(false)
             setShareAccessLogsError(null)
             setIsShareDetailLoading(false)
             setIsShareAccessLogsLoading(false)
@@ -2771,19 +2820,23 @@ const NoteGraph = memo<NoteGraphProps>(
                                             >
                                                 访问记录
                                             </h4>
-                                            {!isShareAccessLogsLoading && !shareAccessLogsError && (
+                                            {shareAccessLogs.length > 0 && (
                                                 <span className="text-xs text-slate-500">
-                                                    共 {shareAccessLogs.length} 条
+                                                    {shareAccessLogsHasMore ? '已加载' : '共'}{' '}
+                                                    {shareAccessLogs.length} 条
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="h-48 overflow-auto rounded-lg border border-slate-700 bg-slate-950/70">
-                                            {isShareAccessLogsLoading ? (
+                                        <div
+                                            className="h-48 overflow-auto rounded-lg border border-slate-700 bg-slate-950/70"
+                                            onScroll={handleShareAccessLogsScroll}
+                                        >
+                                            {isShareAccessLogsLoading && shareAccessLogs.length === 0 ? (
                                                 <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-500">
                                                     <LoaderCircle className="h-4 w-4 animate-spin text-indigo-400" />
                                                     正在加载访问记录
                                                 </div>
-                                            ) : shareAccessLogsError ? (
+                                            ) : shareAccessLogsError && shareAccessLogs.length === 0 ? (
                                                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
                                                     <p className="text-sm text-rose-400">
                                                         {shareAccessLogsError}
@@ -2801,6 +2854,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                                     暂无访问记录
                                                 </div>
                                             ) : (
+                                                <>
                                                 <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
                                                     <thead className="sticky top-0 z-10 bg-slate-900 text-xs text-slate-400">
                                                         <tr>
@@ -2876,6 +2930,39 @@ const NoteGraph = memo<NoteGraphProps>(
                                                         ))}
                                                     </tbody>
                                                 </table>
+                                                {isShareAccessLogsLoading && (
+                                                    <div className="flex items-center justify-center gap-2 border-t border-slate-800 px-4 py-3 text-xs text-slate-500">
+                                                        <LoaderCircle className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                                                        正在加载更多
+                                                    </div>
+                                                )}
+                                                {shareAccessLogsError && (
+                                                    <div className="flex items-center justify-center gap-3 border-t border-slate-800 px-4 py-3 text-xs">
+                                                        <span className="text-rose-400">
+                                                            {shareAccessLogsError}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            className="cursor-pointer text-indigo-300 transition-colors hover:text-indigo-200"
+                                                            onClick={() =>
+                                                                void loadShareAccessLogs(
+                                                                    shareDetail.id,
+                                                                    shareAccessLogsCursor ?? undefined
+                                                                )
+                                                            }
+                                                        >
+                                                            重新加载
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {!shareAccessLogsHasMore &&
+                                                    !isShareAccessLogsLoading &&
+                                                    !shareAccessLogsError && (
+                                                        <div className="border-t border-slate-800 px-4 py-3 text-center text-xs text-slate-600">
+                                                            已加载全部访问记录
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </section>

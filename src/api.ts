@@ -175,6 +175,12 @@ export interface NoteShareAccessLog {
     createdAt: string
 }
 
+export interface NoteShareAccessLogPage {
+    list: NoteShareAccessLog[]
+    hasMore: boolean
+    nextCursor: string | null
+}
+
 export interface Article {
     id: number
     content: string | null
@@ -394,12 +400,23 @@ export async function getNoteShareDetail(directoryNodeId: number): Promise<NoteS
 }
 
 export async function getNoteShareAccessLogs(
-    noteShareId: number
-): Promise<NoteShareAccessLog[]> {
-    const response = await authFetch(`${API_BASE_URL}/note/share/access-logs/${noteShareId}`)
-    const res = (await response.json()) as ApiResponse<NoteShareAccessLog[]>
+    noteShareId: number,
+    cursor?: string
+): Promise<NoteShareAccessLogPage> {
+    const searchParams = new URLSearchParams()
+    if (cursor) searchParams.set('cursor', cursor)
+    const query = searchParams.toString()
+    const response = await authFetch(
+        `${API_BASE_URL}/note/share/access-logs/${noteShareId}${query ? `?${query}` : ''}`
+    )
+    const res = (await response.json()) as ApiResponse<NoteShareAccessLogPage>
 
-    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+    if (
+        !response.ok ||
+        res.code !== 0 ||
+        !res.data ||
+        !Array.isArray(res.data.list)
+    ) {
         throw new Error(res.message || '访问记录加载失败')
     }
 
