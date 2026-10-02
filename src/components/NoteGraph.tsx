@@ -727,7 +727,9 @@ const NoteGraph = memo<NoteGraphProps>(
                                 Toast.error('引用的详情节点不存在')
                                 return
                             }
-                            graphViewerRef.current?.centerOn(targetNode.x, targetNode.y)
+                            graphViewerRef.current?.centerOn(targetNode.x, targetNode.y, {
+                                animated: true,
+                            })
                             return
                         }
 
@@ -2163,7 +2165,8 @@ const NoteGraph = memo<NoteGraphProps>(
                                                         onClick={() =>
                                                             graphViewerRef.current?.centerOn(
                                                                 node.x,
-                                                                node.y
+                                                                node.y,
+                                                                { animated: true }
                                                             )
                                                         }
                                                         title={label}
@@ -3352,7 +3355,9 @@ const NoteGraph = memo<NoteGraphProps>(
                                 onClose={() => setIsDetailCanvasSearchOpen(false)}
                                 onView={(node) => {
                                     setIsDetailCanvasSearchOpen(false)
-                                    graphViewerRef.current?.centerOn(node.x, node.y)
+                                    graphViewerRef.current?.centerOn(node.x, node.y, {
+                                        animated: true,
+                                    })
                                 }}
                             />
                         )}

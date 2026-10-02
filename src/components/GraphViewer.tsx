@@ -25,9 +25,18 @@ export interface GraphViewport extends StoredGraphViewport {
     height: number
 }
 
+interface ViewportTransitionOptions {
+    animated?: boolean
+    duration?: number
+}
+
+interface CenterOnOptions extends ViewportTransitionOptions {
+    zoom?: number
+}
+
 export interface GraphViewerHandle {
-    resetView: () => void
-    centerOn: (x: number, y: number) => void
+    resetView: (options?: ViewportTransitionOptions) => void
+    centerOn: (x: number, y: number, options?: CenterOnOptions) => void
     getViewport: () => GraphViewport
 }
 
@@ -64,6 +73,13 @@ const toStoredViewport = (viewport: GraphViewport): StoredGraphViewport => ({
     zoom: viewport.zoom,
 })
 
+const DEFAULT_VIEWPORT_ANIMATION_DURATION = 360
+
+const easeOutCubic = (progress: number) => 1 - Math.pow(1 - progress, 3)
+
+const lerp = (start: number, end: number, progress: number) =>
+    start + (end - start) * progress
+
 const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function GraphViewer(
     {
         nodes,
@@ -93,6 +109,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
     const hasInitializedRef = useRef(false)
     const hasAppliedInitialViewportRef = useRef(false)
     const wheelCommitTimerRef = useRef<number | null>(null)
+    const viewportAnimationFrameRef = useRef<number | null>(null)
     const onViewportCommitRef = useRef(onViewportCommit)
     const gestureInfo = useRef<GestureInfo>({
         type: 'none',
@@ -121,7 +138,65 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         onViewportCommitRef.current?.(nextViewport)
     }, [])
 
-    const resetView = useCallback(() => {
+    const cancelViewportAnimation = useCallback(() => {
+        if (viewportAnimationFrameRef.current === null) return
+        window.cancelAnimationFrame(viewportAnimationFrameRef.current)
+        viewportAnimationFrameRef.current = null
+    }, [])
+
+    const moveViewportTo = useCallback(
+        (targetViewport: GraphViewport, options: ViewportTransitionOptions = {}) => {
+            cancelViewportAnimation()
+            if (wheelCommitTimerRef.current !== null) {
+                window.clearTimeout(wheelCommitTimerRef.current)
+                wheelCommitTimerRef.current = null
+            }
+
+            // 系统启用“减少动态效果”时自动退化为立即定位
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            const duration = options.duration ?? DEFAULT_VIEWPORT_ANIMATION_DURATION
+            if (!options.animated || reduceMotion || duration <= 0) {
+                viewportRef.current = targetViewport
+                setViewport(targetViewport)
+                commitViewport(toStoredViewport(targetViewport))
+                return
+            }
+
+            const startViewport = viewportRef.current
+            const startedAt = performance.now()
+
+            const animate = (now: number) => {
+                const progress = Math.min((now - startedAt) / duration, 1)
+                const easedProgress = easeOutCubic(progress)
+                const zoom = lerp(startViewport.zoom, targetViewport.zoom, easedProgress)
+                const nextViewport: GraphViewport = {
+                    x: lerp(startViewport.x, targetViewport.x, easedProgress),
+                    y: lerp(startViewport.y, targetViewport.y, easedProgress),
+                    width: paperSize.width * zoom,
+                    height: paperSize.height * zoom,
+                    zoom,
+                }
+
+                viewportRef.current = nextViewport
+                setViewport(nextViewport)
+
+                if (progress < 1) {
+                    viewportAnimationFrameRef.current = window.requestAnimationFrame(animate)
+                    return
+                }
+
+                viewportAnimationFrameRef.current = null
+                viewportRef.current = targetViewport
+                setViewport(targetViewport)
+                commitViewport(toStoredViewport(targetViewport))
+            }
+
+            viewportAnimationFrameRef.current = window.requestAnimationFrame(animate)
+        },
+        [cancelViewportAnimation, commitViewport, paperSize]
+    )
+
+    const resetView = useCallback((options: ViewportTransitionOptions = {}) => {
         const firstRootNode = nodes.find((node) => node.parentId === null)
         const nextViewport: GraphViewport = firstRootNode
             ? {
@@ -139,13 +214,13 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                   y: 0,
               }
 
-        setViewport(nextViewport)
-        commitViewport(toStoredViewport(nextViewport))
-    }, [commitViewport, nodes, paperSize])
+        moveViewportTo(nextViewport, options)
+    }, [moveViewportTo, nodes, paperSize])
 
     const centerOn = useCallback(
-        (x: number, y: number, zoom = viewportRef.current.zoom || 1) => {
+        (x: number, y: number, options: CenterOnOptions = {}) => {
             if (paperSize.width <= 0 || paperSize.height <= 0) return
+            const zoom = (options.zoom ?? viewportRef.current.zoom) || 1
 
             const nextViewport: GraphViewport = {
                 x: x - (paperSize.width * zoom) / 2,
@@ -154,10 +229,9 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                 height: paperSize.height * zoom,
                 zoom,
             }
-            setViewport(nextViewport)
-            commitViewport(toStoredViewport(nextViewport))
+            moveViewportTo(nextViewport, options)
         },
-        [commitViewport, paperSize]
+        [moveViewportTo, paperSize]
     )
 
     useImperativeHandle(
@@ -192,6 +266,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             const { width, height } = container.getBoundingClientRect()
             if (width <= 0 || height <= 0) return
 
+            cancelViewportAnimation()
             setPaperSize({ width, height })
             setViewport((previous) => ({
                 ...previous,
@@ -205,7 +280,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         if (containerRef.current) resizeObserver.observe(containerRef.current)
 
         return () => resizeObserver.disconnect()
-    }, [])
+    }, [cancelViewportAnimation])
 
     // init viewport
     useEffect(() => {
@@ -218,7 +293,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             didApplyViewport = true
             hasAppliedInitialViewportRef.current = true
             if (initialCenter) {
-                centerOn(initialCenter.x, initialCenter.y, 1)
+                centerOn(initialCenter.x, initialCenter.y, { zoom: 1 })
                 return
             }
             if (!resetOnMount && initialViewport) {
@@ -247,6 +322,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         const gesture = gestureInfo.current
 
         const onPointerDown = (event: PointerEvent) => {
+            cancelViewportAnimation()
             if (!panFromNodes && event.target !== paperElement) return
 
             // return if it's not left click
@@ -364,7 +440,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             paperElement?.removeEventListener('pointermove', onPointerMove)
             paperElement?.removeEventListener('pointerup', onPointerUp)
         }
-    }, [commitViewport, panFromNodes, paperSize])
+    }, [cancelViewportAnimation, commitViewport, panFromNodes, paperSize])
 
     // zooming
     useEffect(() => {
@@ -372,6 +448,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
 
         const onWheel = (event: WheelEvent) => {
             // console.log(e);
+            cancelViewportAnimation()
             setViewport((previous) => {
                 let nextZoom = previous.zoom
                 if (event.deltaY < 0) {
@@ -405,17 +482,18 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
 
         paperElement?.addEventListener('wheel', onWheel)
         return () => paperElement?.removeEventListener('wheel', onWheel)
-    }, [paperSize, scheduleViewportCommit])
+    }, [cancelViewportAnimation, paperSize, scheduleViewportCommit])
 
     useEffect(() => {
         return () => {
+            cancelViewportAnimation()
             if (wheelCommitTimerRef.current !== null) {
                 window.clearTimeout(wheelCommitTimerRef.current)
             }
             if (!hasAppliedInitialViewportRef.current) return
             commitViewport(toStoredViewport(viewportRef.current))
         }
-    }, [commitViewport])
+    }, [cancelViewportAnimation, commitViewport])
 
     return (
         <div ref={containerRef} className="relative h-full w-full overflow-hidden">
@@ -437,7 +515,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                         type="button"
                         onClick={() => {
                             onResetView?.()
-                            resetView()
+                            resetView({ animated: true })
                         }}
                         className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-indigo-300"
                         title="重置视图"
