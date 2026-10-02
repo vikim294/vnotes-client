@@ -23,6 +23,8 @@ export interface NodeData {
   refDirectoryNodeId?: number | null;
   refDetailNodeId?: number | null;
   tagIds?: number[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type NodeType = "DIRECTORY" | "DETAIL";

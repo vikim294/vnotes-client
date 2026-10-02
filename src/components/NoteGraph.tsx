@@ -81,6 +81,7 @@ import TagManagementModal from './TagManagementModal'
 import DirectoryTags, { NoteTagList } from './DirectoryTags'
 import TagCheckboxGroup from './TagCheckboxGroup'
 import DetailNodePickerModal from './DetailNodePickerModal'
+import DetailCanvasSearchModal from './DetailCanvasSearchModal'
 import GraphViewer, {
     type GraphViewerHandle,
     type GraphViewport,
@@ -617,6 +618,7 @@ const NoteGraph = memo<NoteGraphProps>(
 
         // search modal
         const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+        const [isDetailCanvasSearchOpen, setIsDetailCanvasSearchOpen] = useState(false)
         const [isTrashBinOpen, setIsTrashBinOpen] = useState(false)
         const [isNotificationOpen, setIsNotificationOpen] = useState(false)
         const [isTagManagementOpen, setIsTagManagementOpen] = useState(false)
@@ -2183,6 +2185,18 @@ const NoteGraph = memo<NoteGraphProps>(
                             )}
                     </div>
 
+                    {graphType === 'detail' && (
+                        <button
+                            type="button"
+                            onClick={() => setIsDetailCanvasSearchOpen(true)}
+                            className="fixed top-24 left-4 z-30 grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-cyan-300"
+                            title="搜索当前画布节点"
+                            aria-label="搜索当前画布节点"
+                        >
+                            <Search className="h-6 w-6" strokeWidth={1} />
+                        </button>
+                    )}
+
                     {graphType === 'directory' && (
                         <div className="fixed top-16 left-4 flex flex-col gap-2">
                             <button
@@ -2298,7 +2312,7 @@ const NoteGraph = memo<NoteGraphProps>(
                                         >
                                             <div className="flex items-center gap-2">
                                                 <Search className="h-5 w-5 text-cyan-400 sm:h-4 sm:w-4" />
-                                                <span className="sr-only sm:not-sr-only">search</span>
+                                                <span className="sr-only sm:not-sr-only">search notes</span>
                                             </div>
                                         </Button>
                                     </div>
@@ -3331,6 +3345,17 @@ const NoteGraph = memo<NoteGraphProps>(
                                 })
                             }
                         />
+                        {isDetailCanvasSearchOpen && (
+                            <DetailCanvasSearchModal
+                                open={true}
+                                nodes={visibleNodes}
+                                onClose={() => setIsDetailCanvasSearchOpen(false)}
+                                onView={(node) => {
+                                    setIsDetailCanvasSearchOpen(false)
+                                    graphViewerRef.current?.centerOn(node.x, node.y)
+                                }}
+                            />
+                        )}
                         <TrashBinModal
                             isOpen={isTrashBinOpen}
                             onClose={() => setIsTrashBinOpen(false)}
