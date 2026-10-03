@@ -30,6 +30,7 @@ export function authFetch(url: string, init?: RequestInit): Promise<Response> {
 export interface Note {
     id: number
     label: string
+    path: string[]
     x: number
     y: number
     parentId: number | null

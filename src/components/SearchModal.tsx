@@ -518,6 +518,12 @@ export default function SearchModal({
                                             )}
                                             <span className="min-w-0 flex-1">
                                                 <span className="block truncate text-sm">{note.label}</span>
+                                                <span
+                                                    className="mt-0.5 block truncate text-xs text-slate-400"
+                                                    title={note.path.join('/')}
+                                                >
+                                                    {note.path.join('/')}
+                                                </span>
                                                 <span className="mt-0.5 block text-xs text-slate-500">
                                                     {new Date(note.createdAt).toLocaleDateString('zh-CN')}
                                                 </span>
