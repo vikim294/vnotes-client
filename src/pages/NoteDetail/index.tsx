@@ -4,6 +4,7 @@ import { type NodeData, type NoteDetailData } from '../../types'
 import { useLocation, useParams } from 'react-router'
 import { getDetailNodesByDirectoryNodeId, getDirectoryNodeById } from '../../api'
 import NoteGraph from '../../components/NoteGraph'
+import GraphLoadingScreen from '../../components/GraphLoadingScreen'
 
 function NoteDetail() {
     const location = useLocation()
@@ -80,9 +81,10 @@ function NoteDetail() {
 
     if (loadedPageKey !== pageKey) {
         return (
-            <div className="grid h-full place-items-center bg-black text-slate-400">
-                正在加载笔记…
-            </div>
+            <GraphLoadingScreen
+                title="正在加载笔记"
+                description="正在恢复画布中的节点与视角"
+            />
         )
     }
 

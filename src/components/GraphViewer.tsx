@@ -95,6 +95,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
     },
     ref
 ) {
+    const [isViewportReady, setIsViewportReady] = useState(false)
     const [paperSize, setPaperSize] = useState({ width: 0, height: 0 })
     const [viewport, setViewport] = useState<GraphViewport>({
         x: 0,
@@ -292,10 +293,15 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
         const timer = window.setTimeout(() => {
             didApplyViewport = true
             hasAppliedInitialViewportRef.current = true
+            // --- 初始化视口
+
+            // 跳转并聚焦详情节点 的情况
             if (initialCenter) {
                 centerOn(initialCenter.x, initialCenter.y, { zoom: 1 })
+                setIsViewportReady(true)
                 return
             }
+            // 恢复目录画布/详情画布的视口位置 的情况
             if (!resetOnMount && initialViewport) {
                 setViewport({
                     x: initialViewport.x,
@@ -304,10 +310,13 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
                     width: paperSize.width * initialViewport.zoom,
                     height: paperSize.height * initialViewport.zoom,
                 })
+                setIsViewportReady(true)
                 return
             }
 
+            // 聚焦于第一个根节点（vnotes 画布默认视口位置）
             resetView()
+            setIsViewportReady(true)
         }, 0)
 
         return () => {
@@ -498,6 +507,11 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
     return (
         <div ref={containerRef} className="relative h-full w-full overflow-hidden">
             <svg
+                className={
+                    nodes.length === 0 || isViewportReady
+                        ? 'opacity-100'
+                        : 'pointer-events-none opacity-0'
+                }
                 ref={paperRef}
                 data-testid="note-graph"
                 width={paperSize.width}
