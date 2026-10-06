@@ -68,6 +68,7 @@ const Register = () => {
 
             fetch(API_BASE_URL + '/user/register', {
               method: 'POST',
+              credentials: 'include',
               headers: {
                 'Content-Type': 'application/json',
               },

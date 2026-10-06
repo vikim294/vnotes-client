@@ -14,6 +14,7 @@ export function authFetch(url: string, init?: RequestInit): Promise<Response> {
 
     return fetch(url, {
         ...init,
+        credentials: 'include',
         headers: {
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
             ...init?.headers,
@@ -206,6 +207,7 @@ interface ApiResponse<T> {
 async function postAuth<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
     const response = await fetch(`${API_BASE_URL}${path}`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
         },
@@ -245,21 +247,6 @@ export async function exchangeOAuthLoginCode(
     code: string
 ): Promise<ApiResponse<OAuthTokenResult>> {
     return postAuth<OAuthTokenResult>('/oauth/token', { code })
-}
-
-export async function verifyToken(token: string): Promise<boolean> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ token }),
-        })
-        return response.ok
-    } catch {
-        return false
-    }
 }
 
 export async function searchDirectoryNodes(
