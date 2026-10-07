@@ -56,7 +56,7 @@ export default function DetailNodePickerModal({
             setIsLoading(true)
 
             void getDetailNodesByDirectoryNodeId(directory.id, controller.signal)
-                .then(setNodes)
+                .then((data) => setNodes(data.detailNodes))
                 .catch((requestError: unknown) => {
                     if (
                         requestError instanceof DOMException &&

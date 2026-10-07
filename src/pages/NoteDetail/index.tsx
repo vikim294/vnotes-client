@@ -10,6 +10,7 @@ function NoteDetail() {
     const location = useLocation()
     const [flatTree, setFlatTree] = useState<NodeData[]>([])
     const [noteTitle, setNoteTitle] = useState('')
+    const [noteVersion, setNoteVersion] = useState(0)
     const [loadedPageKey, setLoadedPageKey] = useState<string | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
     const requestIdRef = useRef(0)
@@ -19,7 +20,8 @@ function NoteDetail() {
     const directoryNodeId = Number(id)
     const pageKey = `${directoryNodeId}:${location.key}`
     const noteDetail: NoteDetailData = {
-        directoryNodeId
+        directoryNodeId,
+        version: noteVersion,
     }
 
     const loadNoteDetail = useCallback(async (showLoading: boolean) => {
@@ -36,7 +38,7 @@ function NoteDetail() {
         }
 
         try {
-            const [directoryNode, detailNodes] = await Promise.all([
+            const [directoryNode, detailNodesData] = await Promise.all([
                 getDirectoryNodeById(directoryNodeId),
                 getDetailNodesByDirectoryNodeId(directoryNodeId),
             ])
@@ -44,8 +46,9 @@ function NoteDetail() {
             if (requestId !== requestIdRef.current) return
 
             setNoteTitle(directoryNode.label)
+            setNoteVersion(detailNodesData.version)
             setFlatTree(
-                detailNodes.map((node) => ({
+                detailNodesData.detailNodes.map((node) => ({
                     ...node,
                     // 图片节点的后端 label 为 null，画布内部统一使用空字符串。
                     label: node.label ?? '',
@@ -97,6 +100,7 @@ function NoteDetail() {
             flatTree={flatTree}
             setFlatTree={setFlatTree}
             allowOperate
+            onDetailVersionChange={setNoteVersion}
             onExitEdit={() => void loadNoteDetail(false)}
         />
     )

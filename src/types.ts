@@ -63,6 +63,7 @@ export interface UpdatedNodeDto extends NodeMutationFields {
 }
 
 export interface BatchUpdateNodesDto {
+  version?: number;
   added: AddedNodeDto[];
   updated: UpdatedNodeDto[];
   deletedNodeIds: number[];
@@ -70,6 +71,7 @@ export interface BatchUpdateNodesDto {
 
 export interface NoteDetailData {
   directoryNodeId: number;
+  version: number;
 }
 
 export interface Point {

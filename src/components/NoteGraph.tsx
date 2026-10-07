@@ -98,6 +98,7 @@ interface NoteGraphProps {
     flatTree: NodeData[]
     setFlatTree: React.Dispatch<React.SetStateAction<NodeData[]>>
     onExitEdit: () => void
+    onDetailVersionChange?: (version: number) => void
     allowOperate?: boolean
 }
 
@@ -321,6 +322,7 @@ const NoteGraph = memo<NoteGraphProps>(
         flatTree,
         setFlatTree,
         onExitEdit,
+        onDetailVersionChange,
         allowOperate = true,
     }) => {
         const navigate = useNavigate()
@@ -1206,6 +1208,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 }
 
                 const params: BatchUpdateNodesDto = {
+                    ...(graphType === 'detail' ? { version: noteDetail!.version } : {}),
                     added,
                     updated,
                     deletedNodeIds,
@@ -1281,6 +1284,9 @@ const NoteGraph = memo<NoteGraphProps>(
                     }
 
                     setFlatTree(newFlatTree)
+                    if (graphType === 'detail') {
+                        onDetailVersionChange?.(res.data.version)
+                    }
                     leaveEditMode()
                 } else {
                     Toast.error(res.message || '保存失败')
@@ -1804,11 +1810,13 @@ const NoteGraph = memo<NoteGraphProps>(
             if (moveSourceNodeId === null || !noteDetail) return
 
             try {
-                await moveDetailNode(
+                const nextVersion = await moveDetailNode(
                     noteDetail.directoryNodeId,
+                    noteDetail.version,
                     moveSourceNodeId,
                     note.id
                 )
+                onDetailVersionChange?.(nextVersion)
                 // Find all descendants to remove from flatTree
                 const descendants = findDescendantsByIdInFlatTree(flatTree, moveSourceNodeId)
                 const allIdsToRemove = new Set([moveSourceNodeId, ...descendants.map((d) => d.id)])

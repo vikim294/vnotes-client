@@ -46,6 +46,12 @@ export interface DirectoryNodeInfo {
     id: number
     label: string
     nodeType: NodeType
+    version: number
+}
+
+export interface DetailNodesData {
+    version: number
+    detailNodes: NodeData[]
 }
 
 export interface DetailNodeLocation {
@@ -117,12 +123,12 @@ export async function getDetailNodeLocation(
 export async function getDetailNodesByDirectoryNodeId(
     directoryNodeId: number,
     signal?: AbortSignal
-): Promise<NodeData[]> {
+): Promise<DetailNodesData> {
     const response = await authFetch(
         `${API_BASE_URL}/note/directory/${directoryNodeId}/detail-nodes`,
         { signal }
     )
-    const res = (await response.json()) as ApiResponse<NodeData[]>
+    const res = (await response.json()) as ApiResponse<DetailNodesData>
 
     if (!response.ok || res.code !== 0 || !res.data) {
         throw new Error(res.message || '详情节点加载失败')
@@ -470,22 +476,25 @@ export async function getSharedArticle(
 
 export async function moveDetailNode(
     oldDirectoryNodeId: number,
+    sourceVersion: number,
     detailNodeId: number,
     destDirectoryNodeId: number
-): Promise<void> {
+): Promise<number> {
     const response = await authFetch(
         `${API_BASE_URL}/note/directory/${oldDirectoryNodeId}/detail-nodes/move`,
         {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ detailNodeId, destDirectoryNodeId }),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceVersion, detailNodeId, destDirectoryNodeId }),
         }
     )
-    const res = await response.json()
+    const res = (await response.json()) as ApiResponse<number>
 
     if (!response.ok || res.code !== 0) {
         throw new Error(res.message || '详情节点移动失败')
     }
+
+    return res.data
 }
 
 export async function getArticle(detailNodeId: number): Promise<Article> {
