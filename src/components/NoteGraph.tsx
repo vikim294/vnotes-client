@@ -10,6 +10,7 @@ import {
     FileJson,
     FileText,
     Home,
+    History,
     KeyRound,
     ListTree,
     LoaderCircle,
@@ -82,6 +83,7 @@ import DirectoryTags, { NoteTagList } from './DirectoryTags'
 import TagCheckboxGroup from './TagCheckboxGroup'
 import DetailNodePickerModal from './DetailNodePickerModal'
 import DetailCanvasSearchModal from './DetailCanvasSearchModal'
+import RecentNoteAccessModal from './RecentNoteAccessModal'
 import GraphViewer, {
     type GraphViewerHandle,
     type GraphViewport,
@@ -436,6 +438,7 @@ const NoteGraph = memo<NoteGraphProps>(
         const [editMode, setEditMode] = useState(false)
         const [isSaving, setIsSaving] = useState(false)
         const [isRootNodeListOpen, setIsRootNodeListOpen] = useState(false)
+        const [isRecentNoteAccessOpen, setIsRecentNoteAccessOpen] = useState(false)
         const [nodeMenuVisible, setNodeMenuVisible] = useState(false)
         const nodeMenuRef = useRef<NodeMenuExpose | null>(null)
 
@@ -2124,11 +2127,32 @@ const NoteGraph = memo<NoteGraphProps>(
                         </div>
                     )}
 
+                    {!isSharedView && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsRootNodeListOpen(false)
+                                setIsRecentNoteAccessOpen(true)
+                            }}
+                            className={`fixed left-4 z-30 grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-violet-300 ${
+                                graphType === 'directory' ? 'top-4' : 'top-12'
+                            }`}
+                            title="最近访问"
+                            aria-label="打开最近访问记录"
+                        >
+                            <History className="h-6 w-6" strokeWidth={1} />
+                        </button>
+                    )}
+
                     <div
-                            className={`fixed z-30 ${
+                            className={`fixed left-4 z-30 ${
                                 graphType === 'directory'
-                                    ? 'top-4 left-4'
-                                    : 'top-12 left-4'
+                                    ? isSharedView
+                                        ? 'top-4'
+                                        : 'top-16'
+                                    : isSharedView
+                                      ? 'top-12'
+                                      : 'top-24'
                             }`}
                         >
                             <button
@@ -2200,7 +2224,9 @@ const NoteGraph = memo<NoteGraphProps>(
                         <button
                             type="button"
                             onClick={() => setIsDetailCanvasSearchOpen(true)}
-                            className="fixed top-24 left-4 z-30 grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-cyan-300"
+                            className={`fixed left-4 z-30 grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-slate-900/60 text-slate-400 shadow-lg backdrop-blur-sm transition-colors hover:bg-slate-800/75 hover:text-cyan-300 ${
+                                isSharedView ? 'top-24' : 'top-36'
+                            }`}
                             title="搜索当前画布节点"
                             aria-label="搜索当前画布节点"
                         >
@@ -2209,7 +2235,7 @@ const NoteGraph = memo<NoteGraphProps>(
                     )}
 
                     {graphType === 'directory' && (
-                        <div className="fixed top-16 left-4 flex flex-col gap-2">
+                        <div className="fixed top-28 left-4 z-30 flex flex-col gap-2">
                             <button
                                 type="button"
                                 onClick={handleOpenProfile}
@@ -3377,6 +3403,17 @@ const NoteGraph = memo<NoteGraphProps>(
                         <NotificationModal
                             isOpen={isNotificationOpen}
                             onClose={() => setIsNotificationOpen(false)}
+                        />
+                        <RecentNoteAccessModal
+                            isOpen={isRecentNoteAccessOpen}
+                            currentDirectoryNodeId={noteDetail?.directoryNodeId}
+                            onClose={() => setIsRecentNoteAccessOpen(false)}
+                            onView={(directoryNodeId) => {
+                                setIsRecentNoteAccessOpen(false)
+                                navigate(`/noteDetails/${directoryNodeId}`, {
+                                    state: { resetView: true },
+                                })
+                            }}
                         />
                         <TagManagementModal
                             isOpen={isTagManagementOpen}

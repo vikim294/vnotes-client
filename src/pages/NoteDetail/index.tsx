@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { type NodeData, type NoteDetailData } from '../../types'
 import { useLocation, useParams } from 'react-router'
-import { getDetailNodesByDirectoryNodeId, getDirectoryNodeById } from '../../api'
+import {
+    createNoteAccessRecord,
+    getDetailNodesByDirectoryNodeId,
+    getDirectoryNodeById,
+} from '../../api'
 import NoteGraph from '../../components/NoteGraph'
 import GraphLoadingScreen from '../../components/GraphLoadingScreen'
 
@@ -14,6 +18,7 @@ function NoteDetail() {
     const [loadedPageKey, setLoadedPageKey] = useState<string | null>(null)
     const [loadError, setLoadError] = useState<string | null>(null)
     const requestIdRef = useRef(0)
+    const recordedPageKeyRef = useRef<string | null>(null)
 
     // data related
     const { id } = useParams()
@@ -73,6 +78,13 @@ function NoteDetail() {
             requestIdRef.current += 1
         }
     }, [loadNoteDetail])
+
+    useEffect(() => {
+        if (loadedPageKey !== pageKey || recordedPageKeyRef.current === pageKey) return
+
+        recordedPageKeyRef.current = pageKey
+        void createNoteAccessRecord(directoryNodeId).catch(() => undefined)
+    }, [directoryNodeId, loadedPageKey, pageKey])
 
     if (loadError && loadedPageKey !== pageKey) {
         return (

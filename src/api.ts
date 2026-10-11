@@ -85,6 +85,13 @@ export interface NoteSearchHistory {
     keyword: string
 }
 
+export interface RecentNoteAccess {
+    id: number
+    directoryNodeId: number
+    directoryNodeLabel: string
+    accessedAt: string
+}
+
 export interface PageResponse<T> {
     list: T[]
     page: number
@@ -280,6 +287,33 @@ export async function searchDirectoryNodes(
     }
 
     return res.data as PageResponse<Note>
+}
+
+export async function createNoteAccessRecord(directoryNodeId: number): Promise<void> {
+    const response = await authFetch(
+        `${API_BASE_URL}/note/directory/${directoryNodeId}/access`,
+        { method: 'POST' }
+    )
+    const res = (await response.json()) as ApiResponse<void>
+
+    if (!response.ok || res.code !== 0) {
+        throw new Error(res.message || '笔记访问记录创建失败')
+    }
+}
+
+export async function getRecentNoteAccesses(
+    signal?: AbortSignal
+): Promise<RecentNoteAccess[]> {
+    const response = await authFetch(`${API_BASE_URL}/note/directory/recent-accesses`, {
+        signal,
+    })
+    const res = (await response.json()) as ApiResponse<RecentNoteAccess[]>
+
+    if (!response.ok || res.code !== 0 || !Array.isArray(res.data)) {
+        throw new Error(res.message || '最近访问记录加载失败')
+    }
+
+    return res.data
 }
 
 export async function getNoteSearchHistory(
