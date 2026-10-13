@@ -11,6 +11,7 @@ interface NoteNodeViewProps {
   graphType: "directory" | "detail";
   browseMode?: boolean;
   selected?: boolean;
+  selectionAppearance?: "icon" | "border";
   size?: Size;
   onSizeChange?: (size: Size) => void;
 }
@@ -20,6 +21,7 @@ export default function NoteNodeView({
   graphType,
   browseMode = false,
   selected = false,
+  selectionAppearance = "icon",
   size: controlledSize,
   onSizeChange,
 }: NoteNodeViewProps) {
@@ -58,7 +60,23 @@ export default function NoteNodeView({
         />
       )}
 
-      {selected && (
+      {selected && selectionAppearance === "border" && size.width > 0 && size.height > 0 && (
+        <rect
+          x={size.width / -2 - 3}
+          y={size.height / -2 - 3}
+          width={size.width + 6}
+          height={size.height + 6}
+          rx={9}
+          ry={9}
+          fill="none"
+          stroke="#3b82f6"
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+          pointerEvents="none"
+        />
+      )}
+
+      {selected && selectionAppearance === "icon" && (
         <foreignObject
           x={size.width / -2 - 10}
           y={size.height / -2 - 10}

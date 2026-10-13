@@ -58,6 +58,7 @@ export default function NoteNode(node: NodeData) {
   const setFlatTree = paperContext?.setFlatTree;
   const setNodeMenuVisible = paperContext?.setNodeMenuVisible;
   const selectedNodeId = paperContext?.selectedNodeId;
+  const lockedChildrenNodeIds = paperContext?.lockedChildrenNodeIds;
   const setChosenParentNodeId = paperContext?.setChosenParentNodeId;
   const openArticle = paperContext?.openArticle;
   const openReferencedDetailNode = paperContext?.openReferencedDetailNode;
@@ -202,6 +203,11 @@ export default function NoteNode(node: NodeData) {
       }
       setChosenParentNodeId?.(id);
       return;
+    }
+
+    if (editMode) {
+      setSelectedNodeId?.(id);
+      setNodeMenuVisible?.(false);
     }
 
     if (e.pointerType === "mouse") return;
@@ -476,11 +482,13 @@ export default function NoteNode(node: NodeData) {
       gElem?.setPointerCapture(e.pointerId);
 
       // get descendant nodes
-      if (flatTree) {
+      if (flatTree && !lockedChildrenNodeIds?.has(id)) {
         descendantIdsRef.current = findDescendantsByIdInFlatTree(
           flatTree,
           id,
         ).map((item) => item.id);
+      } else {
+        descendantIdsRef.current = [];
       }
     };
 
@@ -536,7 +544,7 @@ export default function NoteNode(node: NodeData) {
       gElem?.removeEventListener("pointerup", onPointerUp);
       gElem?.removeEventListener("lostpointercapture", onLostPointerCapture);
     };
-  }, [id, editMode, viewportZoom, flatTree, setFlatTree]);
+  }, [id, editMode, viewportZoom, flatTree, lockedChildrenNodeIds, setFlatTree]);
 
   // menu event
   useEffect(() => {
@@ -603,6 +611,8 @@ export default function NoteNode(node: NodeData) {
         node={node}
         graphType={graphType ?? "detail"}
         browseMode={browseMode}
+        selected={editMode && selectedNodeId === id}
+        selectionAppearance="border"
         size={nodeSize}
         onSizeChange={handleNodeSizeChange}
       />

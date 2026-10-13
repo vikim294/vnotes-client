@@ -12,6 +12,8 @@ import {
     Home,
     History,
     KeyRound,
+    LockKeyhole,
+    LockKeyholeOpen,
     ListTree,
     LoaderCircle,
     LogOut,
@@ -441,16 +443,37 @@ const NoteGraph = memo<NoteGraphProps>(
         const [isRecentNoteAccessOpen, setIsRecentNoteAccessOpen] = useState(false)
         const [nodeMenuVisible, setNodeMenuVisible] = useState(false)
         const nodeMenuRef = useRef<NodeMenuExpose | null>(null)
+        const [selectedNodeId, setSelectedNodeId] = useState<number | string | null>(null)
+        // 锁定状态按节点分别保存，切换当前选择的节点时不会丢失
+        const [lockedChildrenNodeIds, setLockedChildrenNodeIds] = useState<
+            Set<number | string>
+        >(() => new Set())
 
         const leaveEditMode = () => {
             setEditMode(false)
             setNodeMenuVisible(false)
+            setSelectedNodeId(null)
+            setLockedChildrenNodeIds(new Set())
         }
 
-        const [selectedNodeId, setSelectedNodeId] = useState<number | string | null>(null)
         const selectedNode = useMemo(() => {
             return flatTree.find((node) => node.id === selectedNodeId) ?? null
         }, [flatTree, selectedNodeId])
+        const selectedNodeChildrenLocked =
+            selectedNodeId !== null && lockedChildrenNodeIds.has(selectedNodeId)
+        const toggleSelectedNodeChildrenLock = () => {
+            if (selectedNodeId === null) return
+
+            setLockedChildrenNodeIds((previous) => {
+                const next = new Set(previous)
+                if (next.has(selectedNodeId)) {
+                    next.delete(selectedNodeId)
+                } else {
+                    next.add(selectedNodeId)
+                }
+                return next
+            })
+        }
         const visibleNodes = useMemo(
             () => flatTree.filter((node) => node.opStatus !== 'deleted'),
             [flatTree]
@@ -763,6 +786,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 isSaving,
                 viewportZoom: viewport.zoom,
                 selectedNodeId,
+                lockedChildrenNodeIds,
                 setSelectedNodeId,
                 nodeMenuRef,
                 isChoosingParent,
@@ -781,6 +805,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 isSaving,
                 viewport.zoom,
                 selectedNodeId,
+                lockedChildrenNodeIds,
                 isChoosingParent,
                 openArticle,
                 openReferencedDetailNode,
@@ -2381,6 +2406,28 @@ const NoteGraph = memo<NoteGraphProps>(
                                                         <div className="flex items-center gap-2">
                                                             <Plus className="h-5 w-5 text-emerald-400 sm:h-4 sm:w-4" />
                                                             <span className="sr-only sm:not-sr-only">add new node</span>
+                                                        </div>
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            {!isSaving && selectedNode && selectedNode.opStatus !== 'deleted' && (
+                                                <div>
+                                                    <Button
+                                                        glass
+                                                        className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
+                                                        onClick={toggleSelectedNodeChildrenLock}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            {selectedNodeChildrenLocked ? (
+                                                                <LockKeyholeOpen className="h-5 w-5 text-sky-400 sm:h-4 sm:w-4" />
+                                                            ) : (
+                                                                <LockKeyhole className="h-5 w-5 text-amber-400 sm:h-4 sm:w-4" />
+                                                            )}
+                                                            <span className="sr-only sm:not-sr-only">
+                                                                {selectedNodeChildrenLocked
+                                                                    ? 'unlock children'
+                                                                    : 'lock children'}
+                                                            </span>
                                                         </div>
                                                     </Button>
                                                 </div>

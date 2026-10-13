@@ -10,6 +10,7 @@ const PaperContext = createContext<{
   isSaving: boolean;
   viewportZoom: number;
   selectedNodeId: number | string | null;
+  lockedChildrenNodeIds: ReadonlySet<number | string>;
   nodeMenuRef: React.RefObject<NodeMenuExpose | null>;
   isChoosingParent: boolean;
   setFlatTree: React.Dispatch<React.SetStateAction<NodeData[]>>;
