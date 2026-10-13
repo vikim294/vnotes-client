@@ -7,6 +7,7 @@ import {
     Copy,
     Download,
     Eye,
+    EyeOff,
     FileJson,
     FileText,
     Home,
@@ -448,12 +449,17 @@ const NoteGraph = memo<NoteGraphProps>(
         const [lockedChildrenNodeIds, setLockedChildrenNodeIds] = useState<
             Set<number | string>
         >(() => new Set())
+        // 开启“隐藏其余节点树”后，画布中唯一渲染展示的节点树的根节点 id
+        const [isolatedTreeRootId, setIsolatedTreeRootId] = useState<
+            number | string | null
+        >(null)
 
         const leaveEditMode = () => {
             setEditMode(false)
             setNodeMenuVisible(false)
             setSelectedNodeId(null)
             setLockedChildrenNodeIds(new Set())
+            setIsolatedTreeRootId(null)
         }
 
         const selectedNode = useMemo(() => {
@@ -474,14 +480,60 @@ const NoteGraph = memo<NoteGraphProps>(
                 return next
             })
         }
+
         const visibleNodes = useMemo(
             () => flatTree.filter((node) => node.opStatus !== 'deleted'),
             [flatTree]
         )
+
+        // 找当前选中节点所在树的根节点
+        const selectedTreeRootId = useMemo(() => {
+            if (selectedNodeId === null) return null
+
+            const nodeById = new Map(visibleNodes.map((node) => [node.id, node]))
+            let currentNode = nodeById.get(selectedNodeId)
+            const visitedIds = new Set<number | string>()
+
+            while (
+                currentNode &&
+                currentNode.parentId != null &&
+                !visitedIds.has(currentNode.id)
+            ) {
+                visitedIds.add(currentNode.id)
+                const parentNode = nodeById.get(currentNode.parentId)
+                if (!parentNode) break
+                currentNode = parentNode
+            }
+
+            return currentNode?.id ?? null
+        }, [selectedNodeId, visibleNodes])
+
+        // 画布中渲染展示的节点
+        const displayedNodes = useMemo(() => {
+            if (isolatedTreeRootId === null) return visibleNodes
+
+            const isolatedNodeIds = new Set<number | string>([
+                isolatedTreeRootId,
+                ...findDescendantsByIdInFlatTree(visibleNodes, isolatedTreeRootId).map(
+                    (node) => node.id
+                ),
+            ])
+            return visibleNodes.filter((node) => isolatedNodeIds.has(node.id))
+        }, [isolatedTreeRootId, visibleNodes])
+
         const rootNodes = useMemo(
-            () => visibleNodes.filter((node) => node.parentId == null),
-            [visibleNodes]
+            () => displayedNodes.filter((node) => node.parentId == null),
+            [displayedNodes]
         )
+
+        const toggleOtherTreesVisibility = () => {
+            if (isolatedTreeRootId !== null) {
+                setIsolatedTreeRootId(null)
+                return
+            }
+            if (selectedTreeRootId !== null) setIsolatedTreeRootId(selectedTreeRootId)
+        }
+
         // detail node is only for directory graph
         const [nodeType, setNodeType] = useState<NodeType>('DIRECTORY')
         const [selectableTags, setSelectableTags] = useState<Tag[]>([])
@@ -2109,7 +2161,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 <div className="h-full bg-black">
                     <GraphViewer
                         ref={graphViewerRef}
-                        nodes={flatTree}
+                        nodes={displayedNodes}
                         panFromNodes={browseMode && !editMode}
                         initialViewport={graphInitialView.viewport}
                         initialCenter={graphInitialView.initialCenter}
@@ -2410,6 +2462,31 @@ const NoteGraph = memo<NoteGraphProps>(
                                                     </Button>
                                                 </div>
                                             )}
+                                            {!isSaving &&
+                                                (isolatedTreeRootId !== null ||
+                                                    (selectedNode &&
+                                                        selectedNode.opStatus !== 'deleted')) && (
+                                                    <div>
+                                                        <Button
+                                                            glass
+                                                            className="w-full px-0 py-2.5 sm:justify-start sm:px-3"
+                                                            onClick={toggleOtherTreesVisibility}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                {isolatedTreeRootId !== null ? (
+                                                                    <Eye className="h-5 w-5 text-violet-400 sm:h-4 sm:w-4" />
+                                                                ) : (
+                                                                    <EyeOff className="h-5 w-5 text-violet-400 sm:h-4 sm:w-4" />
+                                                                )}
+                                                                <span className="sr-only sm:not-sr-only">
+                                                                    {isolatedTreeRootId !== null
+                                                                        ? 'show other trees'
+                                                                        : 'hide other trees'}
+                                                                </span>
+                                                            </div>
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             {!isSaving && selectedNode && selectedNode.opStatus !== 'deleted' && (
                                                 <div>
                                                     <Button
@@ -3432,7 +3509,7 @@ const NoteGraph = memo<NoteGraphProps>(
                         {isDetailCanvasSearchOpen && (
                             <DetailCanvasSearchModal
                                 open={true}
-                                nodes={visibleNodes}
+                                nodes={displayedNodes}
                                 onClose={() => setIsDetailCanvasSearchOpen(false)}
                                 onView={(node) => {
                                     setIsDetailCanvasSearchOpen(false)
