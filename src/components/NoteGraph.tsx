@@ -1475,6 +1475,18 @@ const NoteGraph = memo<NoteGraphProps>(
             openNodeMarkModal()
         }
 
+        const handleNodeCopyText = async () => {
+            if (!selectedNode) return
+
+            try {
+                await navigator.clipboard.writeText(selectedNode.label)
+                handleNodeMenuClose()
+                Toast.success('节点文本已复制')
+            } catch {
+                Toast.error('复制失败，请重试')
+            }
+        }
+
         const handleNodeOpenArticle = () => {
             const detailNodeId = selectedNode?.id
             if (
@@ -2555,6 +2567,7 @@ const NoteGraph = memo<NoteGraphProps>(
                         <NodeMenu
                             ref={nodeMenuRef}
                             visible={nodeMenuVisible}
+                            onCopyText={() => void handleNodeCopyText()}
                             onEdit={handleNodeEdit}
                             onAddChild={handleNodeAddChild}
                             onSetParent={handleNodeSetParent}

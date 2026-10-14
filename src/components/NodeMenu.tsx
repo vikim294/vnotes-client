@@ -8,6 +8,7 @@ import {
     Bookmark,
     Share2,
     ArrowRightLeft,
+    Copy,
     FileText,
 } from 'lucide-react'
 import Button from './Button'
@@ -35,6 +36,7 @@ export interface NodeMenuExpose {
  * NodeMenuProps - 节点菜单组件属性
  * @property ref - 用于暴露 setPosition 方法给父组件
  * @property visible - 控制菜单显示/隐藏
+ * @property onCopyText - 复制节点文本回调
  * @property onEdit - 编辑节点内容回调
  * @property onAddChild - 添加子节点回调
  * @property onSetParent - 设置父节点回调
@@ -47,6 +49,7 @@ export interface NodeMenuExpose {
 interface NodeMenuProps {
     ref: React.RefObject<NodeMenuExpose | null>
     visible: boolean
+    onCopyText: () => void
     onEdit: () => void
     onAddChild: () => void
     onSetParent: () => void
@@ -75,6 +78,7 @@ interface NodeMenuProps {
 export default function NodeMenu({
     ref,
     visible,
+    onCopyText,
     onEdit,
     onAddChild,
     onSetParent,
@@ -164,12 +168,20 @@ export default function NodeMenu({
             >
                 {/* 图片节点暂不支持替换图片，只能在画布上调整位置和大小。 */}
                 {selectedNode?.contentType !== 'IMAGE' && (
-                    <Button glass className="block w-full" onClick={onEdit}>
-                        <div className="flex items-center gap-2">
-                            <Pencil className="h-4 w-4 text-sky-400" />
-                            edit text
-                        </div>
-                    </Button>
+                    <>
+                        <Button glass className="block w-full" onClick={onCopyText}>
+                            <div className="flex items-center gap-2">
+                                <Copy className="h-4 w-4 text-violet-400" />
+                                copy text
+                            </div>
+                        </Button>
+                        <Button glass className="block w-full" onClick={onEdit}>
+                            <div className="flex items-center gap-2">
+                                <Pencil className="h-4 w-4 text-sky-400" />
+                                edit text
+                            </div>
+                        </Button>
+                    </>
                 )}
                 {selectedNode?.nodeType !== 'DETAIL' && (
                     // 非 detail 节点才能新增子结点
