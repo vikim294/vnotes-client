@@ -54,7 +54,10 @@ interface GraphViewerProps {
 }
 
 interface GestureInfo {
-    type: 'none' | 'panning' | 'pinchAndZoom'
+    type: 'none' | 'panning' | 'pinchAndZoom',
+    pointerCount: number
+    pointer1Id:  number | null
+    pointer2Id:  number | null
     startX1: number
     startY1: number
     startX2: number
@@ -114,6 +117,9 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
     const onViewportCommitRef = useRef(onViewportCommit)
     const gestureInfo = useRef<GestureInfo>({
         type: 'none',
+        pointerCount: 0,
+        pointer1Id: null,
+        pointer2Id: null,
         startX1: 0,
         startY1: 0,
         startX2: 0,
@@ -339,29 +345,36 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
 
             if (panFromNodes) paperElement?.setPointerCapture(event.pointerId)
 
-            if (event.isPrimary) {
+
+            // 第一个 pointer down 时
+            if (gesture.pointerCount === 0) {
                 gesture.type = 'panning'
+                gesture.pointerCount = 1
+                gesture.pointer1Id = event.pointerId
                 gesture.startX1 = event.clientX
                 gesture.startY1 = event.clientY
-                return
             }
+            else if(gesture.pointerCount === 1){
+                // 第二个 pointer down 时
+                gesture.type = 'pinchAndZoom'
+                gesture.pointerCount = 2
+                gesture.pointer2Id = event.pointerId
+                gesture.startX2 = event.clientX
+                gesture.startY2 = event.clientY
 
-            gesture.type = 'pinchAndZoom'
-            gesture.startX2 = event.clientX
-            gesture.startY2 = event.clientY
-
-            const currentViewport = viewportRef.current
-            const firstPointer = { x: gesture.startX1, y: gesture.startY1 }
-            const secondPointer = { x: gesture.startX2, y: gesture.startY2 }
-            gesture.startD = getDistanceBetweenTwoPoints(firstPointer, secondPointer)
-            const paperRect = paperElement?.getBoundingClientRect()
-            gesture.centerPointX =
-                (firstPointer.x + secondPointer.x) / 2 - (paperRect?.left ?? 0)
-            gesture.centerPointY =
-                (firstPointer.y + secondPointer.y) / 2 - (paperRect?.top ?? 0)
-            gesture.viewportStartX = currentViewport.x
-            gesture.viewportStartY = currentViewport.y
-            gesture.viewportStartZoom = currentViewport.zoom
+                const currentViewport = viewportRef.current
+                const firstPointer = { x: gesture.startX1, y: gesture.startY1 }
+                const secondPointer = { x: gesture.startX2, y: gesture.startY2 }
+                gesture.startD = getDistanceBetweenTwoPoints(firstPointer, secondPointer)
+                const paperRect = paperElement?.getBoundingClientRect()
+                gesture.centerPointX =
+                    (firstPointer.x + secondPointer.x) / 2 - (paperRect?.left ?? 0)
+                gesture.centerPointY =
+                    (firstPointer.y + secondPointer.y) / 2 - (paperRect?.top ?? 0)
+                gesture.viewportStartX = currentViewport.x
+                gesture.viewportStartY = currentViewport.y
+                gesture.viewportStartZoom = currentViewport.zoom
+            }
         }
 
         const onPointerMove = (event: PointerEvent) => {
@@ -383,7 +396,7 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
 
             let firstPointer = { x: event.clientX, y: event.clientY }
             let secondPointer = { x: event.clientX, y: event.clientY }
-            if (event.isPrimary) {
+            if (event.pointerId === gesture.pointer1Id) {
                 secondPointer = { x: gesture.startX2, y: gesture.startY2 }
                 // 更新 gestureData
                 gesture.startX1 = event.clientX
@@ -418,11 +431,27 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
             })
         }
 
-        const onPointerUp = () => {
+        const onPointerUp = (event: PointerEvent) => {
             if (gesture.type === 'panning' || gesture.type === 'pinchAndZoom') {
                 commitViewport(toStoredViewport(viewportRef.current))
             }
-            gesture.type = 'none'
+
+            // 如果是双指操作松开了一指
+            // 如果 pointer up 的是 “第一个” pointer 的话，就把第二个 pointer 作为 第一个 pointer
+            if(gesture.pointerCount === 2) {
+                if(event.pointerId === gesture.pointer1Id) {
+                    gesture.startX1 = gesture.startX2
+                    gesture.startY1 = gesture.startY2
+                    gesture.pointer1Id = gesture.pointer2Id
+                }
+
+                gesture.pointerCount = 1
+                gesture.type = 'panning'
+            }
+            else {
+                gesture.pointerCount = 0
+                gesture.type = 'none'
+            }
         }
 
         const preventTouchScroll = (event: TouchEvent) => {
