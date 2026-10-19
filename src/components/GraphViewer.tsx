@@ -275,11 +275,21 @@ const GraphViewer = forwardRef<GraphViewerHandle, GraphViewerProps>(function Gra
 
             cancelViewportAnimation()
             setPaperSize({ width, height })
-            setViewport((previous) => ({
-                ...previous,
-                width,
-                height,
-            }))
+            setViewport((previous) => {
+                // 先根据浏览器窗口最新尺寸 和 zoom，算出 viewBox 的宽高
+                const nextWidth = width * previous.zoom
+                const nextHeight = height * previous.zoom
+
+                const nextViewport = {
+                    ...previous,
+                    // 再把宽高增量取一半，加到之前的 x 和 y 上，保证中心不变
+                    x: previous.x + (previous.width - nextWidth) / 2,
+                    y: previous.y + (previous.height - nextHeight) / 2,
+                    width: nextWidth,
+                    height: nextHeight,
+                }
+                return nextViewport
+            })
         }
 
         updateSize()
