@@ -488,8 +488,8 @@ export default function SearchModal({
 
                 <div className="border-t border-slate-700/60"></div>
 
-                <div className='max-h-[55vh] overflow-auto relative'>
-                    <div className="">
+                <div className="flex max-h-[55vh] min-h-0 flex-col overflow-hidden">
+                    <div className="min-h-0 flex-1 overflow-y-auto">
                         {isLoading ? (
                             <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-slate-500">
                                 <LoaderCircle className="h-6 w-6 animate-spin text-indigo-400" />
@@ -583,7 +583,7 @@ export default function SearchModal({
                         )}
                     </div>
 
-                    <div className="sticky right-0 bottom-0 left-0 flex flex-col gap-3 border-t border-slate-700/60 bg-black px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex shrink-0 flex-col gap-3 border-t border-slate-700/60 bg-black px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-slate-400">
                             共 <span className="font-medium text-slate-200">{result.total}</span> 条，
                             第 <span className="font-medium text-slate-200">{page}</span> / {totalPages} 页

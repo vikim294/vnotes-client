@@ -268,14 +268,15 @@ export default function TrashBinModal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-start justify-center bg-black/65 p-4 pt-10 sm:pt-16"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
             onPointerDown={handleClose}
         >
             <div
                 className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/30 shadow-2xl backdrop-blur-md"
                 onPointerDown={(event) => event.stopPropagation()}
             >
-                <div className="border-b border-slate-700/60 bg-black/20 px-5 pt-5 pb-4">
+                <div className="max-h-[35vh] shrink-0 overflow-y-auto">
+                    <div className="border-b border-slate-700/60 bg-black/20 px-5 pt-5 pb-4">
                     <div className="mb-3 flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500/10 text-rose-400">
@@ -336,9 +337,9 @@ export default function TrashBinModal({
                             </button>
                         )}
                     </div>
-                </div>
+                    </div>
 
-                <div className="border-b border-slate-700/60 bg-black/15 px-5 py-4">
+                    <div className="border-b border-slate-700/60 bg-black/15 px-5 py-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
                             <SlidersHorizontal className="h-4 w-4 text-slate-500" />
@@ -413,10 +414,12 @@ export default function TrashBinModal({
                             />
                         </label>
                     </div>
+                    </div>
                 </div>
 
-                <div className="flex min-h-12 items-center justify-between gap-3 border-b border-slate-700/60 bg-black/25 px-5 py-2.5">
-                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+                <div className="flex max-h-[51vh] min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="flex min-h-12 shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-slate-700/60 bg-black/25 px-5 py-2.5">
+                    <label className="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-xs text-slate-300">
                         <input
                             type="checkbox"
                             checked={isCurrentPageSelected}
@@ -426,15 +429,15 @@ export default function TrashBinModal({
                         />
                         全选当前页
                     </label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500">
+                    <div className="flex shrink-0 items-center gap-2">
+                        <span className="whitespace-nowrap text-xs text-slate-500">
                             已选择 <span className="font-medium text-slate-200">{selectedIds.size}</span> 项
                         </span>
                         <button
                             type="button"
                             disabled={selectedIds.size === 0 || isMutating}
                             onClick={() => void handleRestore()}
-                            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+                            className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md bg-emerald-600 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
                         >
                             {isRestoring ? (
                                 <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -447,7 +450,7 @@ export default function TrashBinModal({
                             type="button"
                             disabled={selectedIds.size === 0 || isMutating}
                             onClick={() => setIsDeleteConfirmOpen(true)}
-                            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-rose-600 px-3 text-xs font-medium text-white transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+                            className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md bg-rose-600 px-3 text-xs font-medium text-white transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                             彻底删除
@@ -455,7 +458,7 @@ export default function TrashBinModal({
                     </div>
                 </div>
 
-                <div className="min-h-64 flex-1 overflow-y-auto">
+                <div className="min-h-0 flex-1 overflow-y-auto">
                     {isLoading ? (
                         <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-slate-500">
                             <LoaderCircle className="h-6 w-6 animate-spin text-rose-400" />
@@ -516,13 +519,13 @@ export default function TrashBinModal({
                     )}
                 </div>
 
-                <div className="flex flex-col gap-3 border-t border-slate-700/60 bg-black/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs text-slate-400">
+                <div className="flex shrink-0 flex-col gap-3 overflow-x-auto border-t border-slate-700/60 bg-black/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="shrink-0 whitespace-nowrap text-xs text-slate-400">
                         共 <span className="font-medium text-slate-200">{result.total}</span> 条，
                         第 <span className="font-medium text-slate-200">{page}</span> / {totalPages} 页
                     </p>
 
-                    <nav className="flex items-center gap-1" aria-label="回收站分页">
+                    <nav className="flex shrink-0 items-center gap-1" aria-label="回收站分页">
                         <button
                             type="button"
                             disabled={page <= 1 || isLoading || isMutating}
@@ -566,6 +569,7 @@ export default function TrashBinModal({
                             下一页 <ChevronRight className="h-3.5 w-3.5" />
                         </button>
                     </nav>
+                </div>
                 </div>
             </div>
 

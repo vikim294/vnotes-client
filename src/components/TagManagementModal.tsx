@@ -278,12 +278,12 @@ export default function TagManagementModal({ isOpen, onClose }: TagManagementMod
                             </div>
                         </div>
                     ) : (
-                        <table className="w-full table-fixed border-separate border-spacing-0 text-left">
+                        <table className="w-max min-w-full table-auto border-separate border-spacing-0 text-left whitespace-nowrap">
                             <thead>
                                 <tr className="text-xs text-slate-500">
-                                    <th className="w-[42%] border-b border-slate-700 px-3 py-3 font-medium">标签</th>
-                                    <th className="w-[28%] border-b border-slate-700 px-3 py-3 font-medium">创建时间</th>
-                                    <th className="w-[30%] border-b border-slate-700 px-3 py-3 text-right font-medium">操作</th>
+                                    <th className="border-b border-slate-700 px-3 py-3 font-medium">标签</th>
+                                    <th className="border-b border-slate-700 px-3 py-3 font-medium">创建时间</th>
+                                    <th className="border-b border-slate-700 px-3 py-3 text-right font-medium">操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -294,7 +294,7 @@ export default function TagManagementModal({ isOpen, onClose }: TagManagementMod
 
                                     return (
                                         <tr key={tag.id} className="text-sm text-slate-300">
-                                            <td className="border-b border-slate-800 px-3 py-3.5 align-middle">
+                                            <td className="border-b border-slate-800 px-3 py-3.5 align-middle whitespace-nowrap">
                                                 {isEditing ? (
                                                     <input
                                                         value={editingName}
@@ -306,23 +306,23 @@ export default function TagManagementModal({ isOpen, onClose }: TagManagementMod
                                                         maxLength={100}
                                                         autoFocus
                                                         aria-label={`重命名标签 ${tag.name}`}
-                                                        className="w-full rounded-md border border-indigo-500 bg-slate-950 px-2.5 py-1.5 text-sm text-slate-100 outline-none"
+                                                        className="min-w-64 rounded-md border border-indigo-500 bg-slate-950 px-2.5 py-1.5 text-sm text-slate-100 outline-none"
                                                     />
                                                 ) : (
-                                                    <span className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-700/60 bg-black/20 px-3 py-1.5 text-slate-300">
+                                                    <span className="inline-flex items-center gap-2 rounded-md border border-slate-700/60 bg-black/20 px-3 py-1.5 text-slate-300 whitespace-nowrap">
                                                         <TagIcon className="h-3.5 w-3.5 shrink-0" />
-                                                        <span className="truncate" title={tag.name}>{tag.name}</span>
+                                                        <span title={tag.name}>{tag.name}</span>
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="border-b border-slate-800 px-3 py-3.5 align-middle text-xs text-slate-500">
-                                                <span className="flex items-center gap-1.5">
+                                            <td className="border-b border-slate-800 px-3 py-3.5 align-middle text-xs text-slate-500 whitespace-nowrap">
+                                                <span className="flex items-center gap-1.5 whitespace-nowrap">
                                                     <CalendarDays className="h-3.5 w-3.5 shrink-0" />
                                                     {formatCreatedAt(tag.createdAt)}
                                                 </span>
                                             </td>
-                                            <td className="border-b border-slate-800 px-3 py-3.5 align-middle">
-                                                <div className="flex flex-wrap justify-end gap-2">
+                                            <td className="border-b border-slate-800 px-3 py-3.5 align-middle whitespace-nowrap">
+                                                <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap [&>button]:shrink-0">
                                                     {isEditing ? (
                                                         <>
                                                             <button
