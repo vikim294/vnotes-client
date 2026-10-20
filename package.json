@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.7.0",
+    "markdown-to-jsx": "^9.10.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router": "^7.13.0",

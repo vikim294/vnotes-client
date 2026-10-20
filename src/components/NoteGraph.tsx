@@ -29,6 +29,7 @@ import {
     Upload,
     X,
 } from 'lucide-react'
+import Markdown from 'markdown-to-jsx/react'
 import { findDescendantsByIdInFlatTree } from '../lib'
 import { useLocation, useNavigate } from 'react-router'
 import { clearAuthSession } from '../authSession'
@@ -117,7 +118,32 @@ const NODE_TEXTAREA_CLASS_NAME =
     'node-text-font bg-textarea w-full resize-none overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700/70 p-3 outline-none! transition-colors focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/15'
 const NODE_TEXTAREA_DESKTOP_MEDIA = '(min-width: 768px)'
 const NODE_TEXTAREA_MAX_HEIGHT = 350
+const ARTICLE_MARKDOWN_CLASS_NAME =
+    'min-h-96 overflow-x-auto rounded-lg border border-slate-700 bg-slate-950/60 p-5 text-slate-200 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:break-all [&_a]:text-cyan-400 [&_a]:underline [&_a]:decoration-cyan-500/40 [&_a]:underline-offset-4 hover:[&_a]:text-cyan-300 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/50 [&_blockquote]:bg-cyan-950/15 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_blockquote]:text-slate-300 [&_code]:rounded [&_code]:bg-slate-800/80 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.9em] [&_code]:text-cyan-100 [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:text-slate-50 [&_h2]:mt-7 [&_h2]:mb-3 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:text-slate-50 [&_h3]:mt-6 [&_h3]:mb-3 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-slate-100 [&_hr]:my-7 [&_hr]:border-slate-700/80 [&_img]:my-5 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-1.5 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-7 [&_p]:my-4 [&_p]:leading-7 [&_pre]:my-5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700/70 [&_pre]:bg-black/35 [&_pre]:p-4 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-slate-200 [&_strong]:font-semibold [&_strong]:text-slate-50 [&_table]:my-5 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700/70 [&_td]:px-3 [&_td]:py-2 [&_th]:border [&_th]:border-slate-700/70 [&_th]:bg-slate-800/60 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-100 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-7'
 const SHARE_NOTE_BASE_URL = `${window.location.origin}/share-note`
+
+const ArticleMarkdown = ({
+    content,
+    className = '',
+}: {
+    content: string | null | undefined
+    className?: string
+}) => (
+    <article className={`${ARTICLE_MARKDOWN_CLASS_NAME} ${className}`}>
+        {content ? (
+            <Markdown
+                options={{
+                    disableParsingRawHTML: true,
+                    forceBlock: true,
+                }}
+            >
+                {content}
+            </Markdown>
+        ) : (
+            <span className="text-slate-500">暂无文章内容</span>
+        )}
+    </article>
+)
 
 const resizeNodeTextarea = (textarea: HTMLTextAreaElement | null) => {
     if (!textarea) return
@@ -617,6 +643,7 @@ const NoteGraph = memo<NoteGraphProps>(
         const [articleModalMode, setArticleModalMode] = useState<'view' | 'edit'>('view')
         const [article, setArticle] = useState<Article | null>(null)
         const [articleContent, setArticleContent] = useState('')
+        const [showArticlePreview, setShowArticlePreview] = useState(false)
         const [isArticleLoading, setIsArticleLoading] = useState(false)
         const [isArticleSaving, setIsArticleSaving] = useState(false)
         const [articleError, setArticleError] = useState<string | null>(null)
@@ -782,6 +809,7 @@ const NoteGraph = memo<NoteGraphProps>(
                 setNodeMenuVisible(false)
                 setArticleDetailNodeId(detailNodeId)
                 setArticleModalMode(mode)
+                setShowArticlePreview(false)
                 openArticleModal()
                 void loadArticle(detailNodeId)
             },
@@ -1507,6 +1535,7 @@ const NoteGraph = memo<NoteGraphProps>(
             setArticleModalMode('view')
             setArticle(null)
             setArticleContent('')
+            setShowArticlePreview(false)
             setArticleError(null)
             setIsArticleLoading(false)
         }
@@ -3236,11 +3265,34 @@ const NoteGraph = memo<NoteGraphProps>(
                         </NodeMarkModal>
 
                         <ArticleModal
-                            width={900}
+                            width={
+                                articleModalMode === 'edit' && showArticlePreview ? 1400 : 900
+                            }
                             header={articleModalMode === 'edit' ? '编辑文章' : '查看文章'}
                             closeOnClickMask={!isArticleSaving}
                             footer={
-                                <div className="flex items-center gap-3">
+                                <div className="flex w-full flex-wrap items-center justify-end gap-3">
+                                    {articleModalMode === 'edit' && (
+                                        <Button
+                                            glass
+                                            className="mr-auto"
+                                            onClick={() =>
+                                                setShowArticlePreview((previous) => !previous)
+                                            }
+                                            disabled={isArticleSaving}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {showArticlePreview ? (
+                                                    <EyeOff className="h-4 w-4 text-amber-400" />
+                                                ) : (
+                                                    <Eye className="h-4 w-4 text-indigo-400" />
+                                                )}
+                                                {showArticlePreview
+                                                    ? '关闭预览'
+                                                    : '显示预览'}
+                                            </span>
+                                        </Button>
+                                    )}
                                     <Button
                                         onClick={handleCloseArticle}
                                         disabled={isArticleSaving}
@@ -3276,28 +3328,46 @@ const NoteGraph = memo<NoteGraphProps>(
                                     )}
                                 </div>
                             ) : article && articleModalMode === 'edit' ? (
-                                <label className="block">
-                                    <span className="mb-2 flex items-center gap-2 text-sm text-slate-400">
-                                        <FileText className="h-4 w-4 text-cyan-400" />
-                                        正文
-                                    </span>
-                                    <textarea
-                                        className="bg-textarea min-h-96 w-full resize-y overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700/70 p-4 leading-7 text-slate-100 outline-none! transition-colors focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/15"
-                                        wrap="off"
-                                        value={articleContent}
-                                        onChange={(event) => setArticleContent(event.target.value)}
-                                        onKeyDown={handleArticleTextareaKeyDown}
-                                        disabled={isArticleSaving}
-                                        placeholder="开始编写文章内容..."
-                                        spellCheck={false}
-                                    />
-                                </label>
-                            ) : article ? (
-                                <article className="min-h-96 overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700 bg-slate-950/60 p-5 leading-7 text-slate-200">
-                                    {article.content || (
-                                        <span className="text-slate-500">暂无文章内容</span>
+                                <div
+                                    className={
+                                        showArticlePreview
+                                            ? 'grid min-w-0 gap-4 md:grid-cols-2'
+                                            : 'block'
+                                    }
+                                >
+                                    <label className="flex min-w-0 flex-col">
+                                        <span className="mb-2 flex items-center gap-2 text-sm text-slate-400">
+                                            <FileText className="h-4 w-4 text-cyan-400" />
+                                            正文
+                                        </span>
+                                        <textarea
+                                            className="bg-textarea min-h-96 w-full flex-1 resize-y overflow-x-auto whitespace-pre [overflow-wrap:normal] rounded-lg border border-slate-700/70 p-4 leading-7 text-slate-100 outline-none! transition-colors focus:border-cyan-500/60 focus:ring-2 focus:ring-cyan-500/15"
+                                            wrap="off"
+                                            value={articleContent}
+                                            onChange={(event) =>
+                                                setArticleContent(event.target.value)
+                                            }
+                                            onKeyDown={handleArticleTextareaKeyDown}
+                                            disabled={isArticleSaving}
+                                            placeholder="开始编写文章内容..."
+                                            spellCheck={false}
+                                        />
+                                    </label>
+                                    {showArticlePreview && (
+                                        <div className="min-w-0">
+                                            <span className="mb-2 flex items-center gap-2 text-sm text-slate-400">
+                                                <Eye className="h-4 w-4 text-indigo-400" />
+                                                Markdown 预览
+                                            </span>
+                                            <ArticleMarkdown
+                                                content={articleContent}
+                                                className="max-h-[60vh] overflow-y-auto"
+                                            />
+                                        </div>
                                     )}
-                                </article>
+                                </div>
+                            ) : article ? (
+                                <ArticleMarkdown content={article.content} />
                             ) : (
                                 <div className="min-h-80" />
                             )}
